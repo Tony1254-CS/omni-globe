@@ -12,7 +12,7 @@ import { TrustBadge } from "@/components/omni/TrustBadge";
 import { ForecastCard } from "@/components/omni/ForecastCard";
 import { LocationSearch } from "@/components/omni/LocationSearch";
 import { getMyProfile } from "@/lib/profile.functions";
-import { formatInTz, formatTimeInTz, cToF, kmhToMph, countryFromTz } from "@/lib/format";
+import { formatInTz, formatTimeInTz, formatOffsetLabel, isValidTz, cToF, kmhToMph, countryFromTz } from "@/lib/format";
 
 type Props = { id: string; type: string; settings: unknown };
 
@@ -62,8 +62,8 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
       merged.label = profile.data.home_label ?? "Home";
     }
     const tz = profile.data.timezone;
-    if (type === "clocks" && tz) {
-      const existing = String(baseSettings.zones ?? "").split(",").map((z) => z.trim()).filter(Boolean).filter((z) => z !== tz);
+    if (type === "clocks" && isValidTz(tz)) {
+      const existing = String(baseSettings.zones ?? "").split(",").map((z) => z.trim()).filter(Boolean).filter(isValidTz).filter((z) => z !== tz);
       merged.zones = [tz, ...existing].slice(0, 6).join(",");
     }
     if (type === "news" && tz) merged.country = countryFromTz(tz);
@@ -189,11 +189,13 @@ function WidgetView({ type, data, tz, units }: { type: string; data: any; tz?: s
     case "aqi": {
       const c = data.current ?? {};
       const aqi = Number(c.primary_aqi ?? c.us_aqi ?? c.european_aqi);
-      const scale: string = c.aqi_scale ?? (Number.isFinite(Number(c.us_aqi)) ? "US" : Number.isFinite(Number(c.european_aqi)) ? "EU" : "—");
+      const rawScale: string = c.aqi_scale ?? (Number.isFinite(Number(c.us_aqi)) ? "US" : Number.isFinite(Number(c.european_aqi)) ? "EU" : "—");
+      const isDerived = rawScale === "US (derived)";
+      const scale = isDerived ? "US" : rawScale;
       const band = !Number.isFinite(aqi) ? "No reading" : scale === "EU"
         ? (aqi <= 20 ? "Good" : aqi <= 40 ? "Fair" : aqi <= 60 ? "Moderate" : aqi <= 80 ? "Poor" : aqi <= 100 ? "Very poor" : "Extremely poor")
         : (aqi <= 50 ? "Good" : aqi <= 100 ? "Moderate" : aqi <= 150 ? "Unhealthy for sensitive groups" : aqi <= 200 ? "Unhealthy" : aqi <= 300 ? "Very unhealthy" : "Hazardous");
-      return <div><p className="text-xs text-muted-foreground">{data.label} · {scale} AQI</p><div className="mt-2 flex items-end gap-3"><p className="text-4xl font-semibold neon-text">{Number.isFinite(aqi) ? num(aqi) : "—"}</p><p className="pb-1 text-sm">{band}</p></div><div className="mt-4 grid grid-cols-2 gap-2 text-xs"><Metric label="PM2.5 µg/m³" value={num(c.pm2_5, 1)} /><Metric label="PM10 µg/m³" value={num(c.pm10, 1)} /><Metric label="NO₂ µg/m³" value={num(c.nitrogen_dioxide, 1)} /><Metric label="Ozone µg/m³" value={num(c.ozone, 1)} /></div></div>;
+      return <div><p className="text-xs text-muted-foreground">{data.label} · {scale} AQI{isDerived ? " · from PM2.5" : ""}</p><div className="mt-2 flex items-end gap-3"><p className="text-4xl font-semibold neon-text">{Number.isFinite(aqi) ? num(aqi) : "—"}</p><p className="pb-1 text-sm">{band}</p></div><div className="mt-4 grid grid-cols-2 gap-2 text-xs"><Metric label="PM2.5 µg/m³" value={num(c.pm2_5, 1)} /><Metric label="PM10 µg/m³" value={num(c.pm10, 1)} /><Metric label="NO₂ µg/m³" value={num(c.nitrogen_dioxide, 1)} /><Metric label="Ozone µg/m³" value={num(c.ozone, 1)} /></div></div>;
     }
     case "earthquakes": return <List items={data.events} render={(e: any) => <><span className="mr-2 inline-grid h-7 w-7 place-items-center rounded bg-destructive/15 text-xs font-bold text-destructive">{num(e.magnitude, 1)}</span><span className="min-w-0 flex-1 truncate">{e.place}</span><a className={linkClass} href={e.url} target="_blank" rel="noreferrer"><ExternalLink className="h-3 w-3" /></a></>} />;
     case "iss": return <div><p className="text-4xl font-semibold neon-text">{num(data.position?.altitude, 0)} km</p><p className="text-xs text-muted-foreground">Altitude · {num(data.position?.velocity, 0)} km/h</p><div className="mt-4 grid grid-cols-2 gap-2"><Metric label="Latitude" value={num(data.position?.latitude, 3)} /><Metric label="Longitude" value={num(data.position?.longitude, 3)} /></div>{data.crew?.number && <p className="mt-3 text-xs">{data.crew.number} people currently in space</p>}</div>;
@@ -217,10 +219,17 @@ function WidgetView({ type, data, tz, units }: { type: string; data: any; tz?: s
 function LiveClocks({ zones }: { zones: string[] }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      setNow(new Date());
+      timer = setTimeout(tick, 1000 - (Date.now() % 1000));
+    };
+    timer = setTimeout(tick, 1000 - (Date.now() % 1000));
+    return () => clearTimeout(timer);
   }, []);
-  return <div className="space-y-2">{zones.map((zone) => <div key={zone} className="flex items-center justify-between rounded bg-secondary/50 p-2"><span className="text-xs text-muted-foreground">{zone.replaceAll("_", " ")}</span><span className="font-mono text-lg">{formatTimeInTz(zone, now)}</span></div>)}</div>;
+  const valid = zones.filter(isValidTz);
+  if (!valid.length) return <Empty label="No valid time zones configured" />;
+  return <div className="space-y-2">{valid.map((zone) => <div key={zone} className="flex items-center justify-between rounded bg-secondary/50 p-2"><div className="min-w-0"><p className="truncate text-xs text-muted-foreground">{zone.replaceAll("_", " ")}</p><p className="text-[10px] text-muted-foreground/70">{formatOffsetLabel(zone, now)}</p></div><span className="font-mono text-lg tabular-nums">{formatTimeInTz(zone, now)}</span></div>)}</div>;
 }
 
 function Metric({ label, value }: { label: string; value: unknown }) { return <div className="rounded bg-secondary/50 p-2"><p className="text-[10px] uppercase text-muted-foreground">{label}</p><p className="mt-0.5 truncate text-sm font-semibold">{String(value ?? "—")}</p></div>; }

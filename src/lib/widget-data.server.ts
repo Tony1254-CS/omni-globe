@@ -2,7 +2,7 @@ import type { WidgetDataResult, WidgetDataValue, WidgetSettings } from "./widget
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 // v5 rejects empty payloads and canonicalizes settings so equivalent widgets share cache.
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v6";
 
 type CacheEntry = { value?: WidgetDataResult; expiresAt: number; retryAt: number; pending?: Promise<WidgetDataResult> };
 const providerCache = new Map<string, CacheEntry>();
@@ -133,7 +133,8 @@ function hasUsableData(type: string, data: WidgetDataValue): boolean {
     case "weather": return Number.isFinite(Number(value.current?.temperature_2m));
     case "aqi": {
       const c = value.current ?? {};
-      return [c.us_aqi, c.european_aqi, c.pm2_5, c.pm10].some((v) => Number.isFinite(Number(v)));
+      const keys = ["us_aqi", "european_aqi", "primary_aqi", "pm2_5", "pm10", "nitrogen_dioxide", "ozone", "sulphur_dioxide", "carbon_monoxide"];
+      return keys.some((k) => Number.isFinite(Number(c[k])));
     }
     case "earthquakes": return Array.isArray(value.events);
     case "iss": return Number.isFinite(Number(value.position?.latitude)) && Number.isFinite(Number(value.position?.longitude));
@@ -237,22 +238,61 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
     }
     case "aqi": {
       const pollutants = "us_aqi,european_aqi,pm10,pm2_5,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide";
+      // US EPA PM2.5 → AQI breakpoints (24hr avg, applied to current reading as best-effort).
+      const pm25ToAqi = (pm: number): number | null => {
+        if (!Number.isFinite(pm) || pm < 0) return null;
+        const bp: Array<[number, number, number, number]> = [
+          [0, 12, 0, 50], [12.1, 35.4, 51, 100], [35.5, 55.4, 101, 150],
+          [55.5, 150.4, 151, 200], [150.5, 250.4, 201, 300], [250.5, 500.4, 301, 500],
+        ];
+        const b = bp.find(([lo, hi]) => pm >= lo && pm <= hi) ?? bp[bp.length - 1];
+        const [lo, hi, aLo, aHi] = b;
+        return Math.round(((aHi - aLo) / (hi - lo)) * (pm - lo) + aLo);
+      };
       const enrich = (current: Record<string, any>) => {
         const us = Number(current?.us_aqi);
         const eu = Number(current?.european_aqi);
-        const primary = Number.isFinite(us) ? us : Number.isFinite(eu) ? eu : null;
-        const scale = Number.isFinite(us) ? "US" : Number.isFinite(eu) ? "EU" : null;
+        let primary: number | null = Number.isFinite(us) ? us : Number.isFinite(eu) ? eu : null;
+        let scale: string | null = Number.isFinite(us) ? "US" : Number.isFinite(eu) ? "EU" : null;
+        if (primary == null) {
+          const derived = pm25ToAqi(Number(current?.pm2_5));
+          if (derived != null) { primary = derived; scale = "US (derived)"; }
+        }
         return { ...current, primary_aqi: primary, aqi_scale: scale };
       };
+      const hasAny = (c: Record<string, any>) =>
+        ["us_aqi", "european_aqi", "pm2_5", "pm10", "nitrogen_dioxide", "ozone"].some((k) => Number.isFinite(Number(c?.[k])));
+      // 1) Open-Meteo current
       try {
         const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=${pollutants}&timezone=auto`);
-        return result(type, "Open-Meteo Air Quality", { label: text(settings.label, "Selected location"), ...data, current: enrich(data.current ?? {}) });
-      } catch {
+        if (hasAny(data.current ?? {})) {
+          return result(type, "Open-Meteo Air Quality", { label: text(settings.label, "Selected location"), ...data, current: enrich(data.current ?? {}) });
+        }
+      } catch { /* fall through */ }
+      // 2) Open-Meteo latest hourly
+      try {
         const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=${pollutants}&past_days=1&forecast_days=1&timezone=auto`);
         const index = Math.max(0, (data.hourly?.time?.length ?? 1) - 1);
         const current = Object.fromEntries(pollutants.split(",").map((key) => [key, data.hourly?.[key]?.[index]]));
-        return result(type, "Open-Meteo Air Quality · latest hourly", { label: text(settings.label, "Selected location"), current: enrich(current) });
-      }
+        if (hasAny(current)) {
+          return result(type, "Open-Meteo Air Quality · latest hourly", { label: text(settings.label, "Selected location"), current: enrich(current) });
+        }
+      } catch { /* fall through */ }
+      // 3) WAQI (World Air Quality Index) — public demo token; covers most global stations.
+      const waqi = await json(`https://api.waqi.info/feed/geo:${lat};${lon}/?token=demo`);
+      const d = waqi?.data;
+      if (!d || waqi.status !== "ok") throw new ProviderError("Air quality unavailable for this location", 503);
+      const iaqi = d.iaqi ?? {};
+      const current = {
+        us_aqi: Number(d.aqi),
+        pm2_5: Number(iaqi.pm25?.v),
+        pm10: Number(iaqi.pm10?.v),
+        nitrogen_dioxide: Number(iaqi.no2?.v),
+        ozone: Number(iaqi.o3?.v),
+        sulphur_dioxide: Number(iaqi.so2?.v),
+        carbon_monoxide: Number(iaqi.co?.v),
+      };
+      return result(type, `WAQI · ${d.city?.name ?? "nearest station"}`, { label: text(settings.label, d.city?.name ?? "Selected location"), current: enrich(current) });
     }
     case "earthquakes": {
       const min = Math.max(0, Math.min(10, number(settings.minMagnitude, 2.5)));
