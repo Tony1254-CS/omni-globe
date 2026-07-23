@@ -62,6 +62,8 @@ function ClientGrid({
       draggableHandle=".widget-handle"
       onLayoutChange={(next: Layout) => setPending(next)}
       compactType="vertical"
+      isResizable
+      resizeHandles={["se"]}
     >
       {children}
     </ResponsiveGrid>

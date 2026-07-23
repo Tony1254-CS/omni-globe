@@ -1,59 +1,46 @@
-# OMNISPHERE 2.0 — Layers 2‑8 Rollout
 
-Layer 1 (Predictive Intelligence) already shipped. Below is the plan for the rest, scoped to what's realistically buildable on the current stack (TanStack Start + Lovable Cloud + Lovable AI) with no paid third‑party accounts. Anything requiring real hardware/paid APIs is simulated honestly (labelled "demo") rather than faked.
+# Plan — Shell polish + feature audit
 
-## Layer 2 — Automation & Workflows
-- New table `automations` (trigger kind, params, action kind, action params, enabled).
-- Trigger kinds reuse the alert evaluator (crypto/weather/AQI/quake/FX threshold, plus "on briefing generated", "on schedule").
-- Action kinds: in‑app notification, append to a "journal" table, generate a briefing, toggle a widget setting.
-- `pg_cron` job (every 5 min) → `/api/public/hooks/run-automations` (verified via anon key) executes due automations.
-- UI: `/automations` route with rule builder (trigger + action pickers) and run history.
+## 1. Sidebar: collapse by default, expand on hover
 
-## Layer 3 — Collaboration (lightweight)
-- Tables: `workspaces`, `workspace_members` (role: owner/editor/viewer), `shared_dashboards` (share a widget layout snapshot via slug).
-- Public read‑only route `/s/$slug` renders a snapshot of widgets (data still fetched live, no auth needed for public sources).
-- Invite by email = generate share link (no email sending, keeps it keyless).
+Rework `src/components/omni/AppShell.tsx`:
+- Sidebar stays fixed on the left but at `w-16` (icon‑only) by default and expands to `w-60` on `hover`/`focus-within` using a CSS transition (`group` + `group-hover:w-60`).
+- Labels fade in only when expanded; icons always visible. Active route still highlighted.
+- Push main content with a matching left margin (`ml-16`) so the expanded panel floats over content without reflowing (prevents jumpy layout).
+- Mobile bottom nav stays as‑is.
 
-## Layer 4 — Custom AI Agents
-- Table `agents` (name, system_prompt, tools[], schedule).
-- Runtime: server fn `runAgent` uses Lovable AI (`google/gemini-3.6-flash`) with tool‑calling over a fixed toolset: `getWidgetData`, `getForecast`, `listAlerts`, `createAlert`, `appendJournal`.
-- UI: `/agents` route to create/edit/run agents; results streamed into an activity log.
+## 2. Light / Dark mode
 
-## Layer 5 — IoT (demo mode)
-- Table `devices` + `device_readings`; a public ingest route `/api/public/hooks/device-ingest` accepting `{device_key, metric, value}` with HMAC.
-- Ship a "Simulator" panel that pushes synthetic readings so the pipeline works out‑of‑the‑box. Real devices can POST later with the same contract.
-- New widget type `iot_device` charts the latest readings.
+- Add `ThemeProvider` (`src/components/theme-provider.tsx`) that toggles the `dark` class on `<html>` and persists to `localStorage` (`omnisphere-theme`), reading it inside `useEffect` to avoid SSR hydration mismatch. Default = dark.
+- Add `ThemeToggle` button (sun/moon icon) in the `AppShell` header.
+- Extend `src/styles.css`: the current `:root` tokens become the dark palette (already dark‑first). Add a light palette under `:root:not(.dark)` (or move dark tokens under `.dark`) — light background near `oklch(0.98 0.005 250)`, dark foreground, softer glass, muted neon accents. Keep neon tokens identical so brand stays consistent.
+- Wrap the app in `ThemeProvider` in `src/routes/__root.tsx`.
 
-## Layer 6 — Vertical Modules
-Four new dashboard *presets* (one‑click layouts) plus a couple of dedicated widgets each — no new backend beyond what layers 1‑2 provide:
-- **Humanitarian**: quakes + ReliefWeb RSS + AQI + weather alerts.
-- **Financial**: crypto + FX + market‑anomaly forecast + news.
-- **Travel**: weather (multi‑city favourites) + AQI + local time + news.
-- **Space**: ISS + launches + NASA APOD + solar/geomagnetic (NOAA SWPC keyless feed).
+## 3. Widget resizing
 
-## Layer 7 — Gamification
-- Table `achievements` + `user_achievements`.
-- Server‑side awarder runs on key actions (first widget, first alert triggered, first briefing, 7‑day streak, first automation, etc.).
-- UI: `/achievements` page + toast on unlock + small streak counter in header.
+`src/components/omni/LayoutGrid.tsx` currently omits `isResizable`, so RGL default (true) applies but no resize handle CSS is guaranteed and `WidgetShell` overflow may clip it. Fix:
+- Pass `isResizable`, `resizeHandles: ['se']`, and ensure `react-resizable/css/styles.css` is already imported (it is).
+- In `src/components/omni/WidgetShell.tsx`, drop `overflow-hidden` on the outer container (keep inner scroll) so the SE handle isn't clipped; add a subtle styled handle (`.react-resizable-handle` override in `styles.css`) matching the neon theme.
+- Ensure `saveLayout` already persists `w`/`h` (it does).
 
-## Layer 8 — Infrastructure Polish
-- Rate‑limit external fetches with an in‑memory token bucket per provider inside `widget-data.server.ts`.
-- Cache upstream responses in a `provider_cache` table (short TTL) so widgets survive provider hiccups and reduce load.
-- Global error boundary + Sentry‑style client log table (`client_errors`) for debugging.
-- Perf: memoise `LiveWidget` renders, virtualise history charts >180 pts.
+## 4. Feature audit — what's actually done vs missing
 
-## Suggested build order (I'll ship in this order unless you say otherwise)
-1. Layer 8 caching + rate‑limit first (stabilises everything below).
-2. Layer 2 Automations (reuses alert engine, immediate value).
-3. Layer 6 Vertical presets (cheap win, big perceived scope).
-4. Layer 4 Custom Agents.
-5. Layer 7 Gamification.
-6. Layer 5 IoT demo.
-7. Layer 3 Collaboration (last — most surface area, least critical for a solo user).
+From `.lovable/plan.md` (Layers 2–8) and current tree:
 
-## Explicit non‑goals
-- No paid APIs, no SMS/email delivery, no real device hardware.
-- No mobile app; PWA install stays as a later polish task.
-- Voice assistant remains from the original spec and is out of this plan unless you ask.
+Done and wired:
+- Layer 1 Predictive Intelligence (anomaly badges, forecasts, briefing).
+- Layer 2 Automations (table + cron hook + `/automations`).
+- Layer 3 Collaboration — `shared_dashboards` + `/shares` + `/s/$slug` public view. Workspaces/members NOT built.
+- Layer 4 Custom Agents (`/agents`, tool‑calling).
+- Layer 5 IoT demo (`/devices`, HMAC ingest). Missing: `iot_device` widget type in `widget-data.server.ts` / `LiveWidget`.
+- Layer 6 Vertical presets (`/presets`).
+- Layer 7 Gamification (`/achievements`). Missing: unlock toast + header streak counter.
+- Layer 8 Infra polish: tables exist (`provider_cache`, `client_errors`), but `widget-data.server.ts` does NOT yet use `provider_cache` or a rate‑limit token bucket. No global error boundary logging into `client_errors`. `LiveWidget` not memoised, history charts not virtualised.
 
-Say "go" to start with step 1, or tell me to reorder / drop layers.
+This turn implements only 1–3 above (UI/shell scope). The audit in section 4 is reported so you can pick the next batch — I won't start those without your say‑so.
+
+## Technical notes
+
+- Theme class on `<html>`: apply pre‑hydration via a tiny inline script in `__root.tsx` head to avoid a flash of dark on light preference.
+- Sidebar hover: pure CSS (`group` + `peer` + transitions), no JS state — keeps SSR stable.
+- Resize handle styling lives as an `@utility` or plain selector in `styles.css` so it themes with tokens.
