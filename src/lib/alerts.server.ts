@@ -47,8 +47,10 @@ async function readValue(row: AlertRow): Promise<number | null> {
     case "aqi": {
       const lat = num(p.lat, 0);
       const lon = num(p.lon, 0);
-      const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi`);
-      return data?.current?.us_aqi ?? null;
+      const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,european_aqi`);
+      const us = Number(data?.current?.us_aqi);
+      const eu = Number(data?.current?.european_aqi);
+      return Number.isFinite(us) ? us : Number.isFinite(eu) ? eu : null;
     }
     case "earthquake": {
       const data = await json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson");

@@ -110,7 +110,7 @@ function issPositionFromElements(element: Record<string, unknown>, at = new Date
 function cacheSettings(type: string, settings: WidgetSettings): WidgetSettings {
   const relevant: Record<string, string[]> = {
     weather: ["lat", "lon"], aqi: ["lat", "lon"], earthquakes: ["minMagnitude"],
-    mars: ["rover"], news: ["query"], reddit: ["subreddit"], crypto: ["coins"],
+    mars: ["rover"], news: ["query", "country"], reddit: ["subreddit"], crypto: ["coins"],
     fx: ["amount", "base", "quote"], countries: ["country"], github: ["language"],
     covid: ["country"], clocks: ["zones"],
   };
@@ -131,7 +131,10 @@ function hasUsableData(type: string, data: WidgetDataValue): boolean {
   const value = data as Record<string, any>;
   switch (type) {
     case "weather": return Number.isFinite(Number(value.current?.temperature_2m));
-    case "aqi": return Number.isFinite(Number(value.current?.us_aqi ?? value.current?.pm2_5));
+    case "aqi": {
+      const c = value.current ?? {};
+      return [c.us_aqi, c.european_aqi, c.pm2_5, c.pm10].some((v) => Number.isFinite(Number(v)));
+    }
     case "earthquakes": return Array.isArray(value.events);
     case "iss": return Number.isFinite(Number(value.position?.latitude)) && Number.isFinite(Number(value.position?.longitude));
     case "spacex": return Boolean(value.name && (value.net || value.date));
@@ -233,14 +236,22 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
       }
     }
     case "aqi": {
+      const pollutants = "us_aqi,european_aqi,pm10,pm2_5,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide";
+      const enrich = (current: Record<string, any>) => {
+        const us = Number(current?.us_aqi);
+        const eu = Number(current?.european_aqi);
+        const primary = Number.isFinite(us) ? us : Number.isFinite(eu) ? eu : null;
+        const scale = Number.isFinite(us) ? "US" : Number.isFinite(eu) ? "EU" : null;
+        return { ...current, primary_aqi: primary, aqi_scale: scale };
+      };
       try {
-        const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5,nitrogen_dioxide,ozone&timezone=auto`);
-        return result(type, "Open-Meteo Air Quality", { label: text(settings.label, "Selected location"), ...data });
+        const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=${pollutants}&timezone=auto`);
+        return result(type, "Open-Meteo Air Quality", { label: text(settings.label, "Selected location"), ...data, current: enrich(data.current ?? {}) });
       } catch {
-        const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=us_aqi,pm10,pm2_5,nitrogen_dioxide,ozone&past_days=1&forecast_days=1&timezone=auto`);
+        const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=${pollutants}&past_days=1&forecast_days=1&timezone=auto`);
         const index = Math.max(0, (data.hourly?.time?.length ?? 1) - 1);
-        const current = Object.fromEntries(["us_aqi", "pm10", "pm2_5", "nitrogen_dioxide", "ozone"].map((key) => [key, data.hourly?.[key]?.[index]]));
-        return result(type, "Open-Meteo Air Quality · latest hourly", { label: text(settings.label, "Selected location"), current });
+        const current = Object.fromEntries(pollutants.split(",").map((key) => [key, data.hourly?.[key]?.[index]]));
+        return result(type, "Open-Meteo Air Quality · latest hourly", { label: text(settings.label, "Selected location"), current: enrich(current) });
       }
     }
     case "earthquakes": {
@@ -339,8 +350,9 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
     }
     case "news": {
       const query = text(settings.query, "world").slice(0, 80);
+      const country = text(settings.country, "US").toUpperCase().slice(0, 2);
       try {
-        const response = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`, {
+        const response = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-${country}&gl=${country}&ceid=${country}:en`, {
           headers: { "User-Agent": "OmniSphere/2.0" }, signal: AbortSignal.timeout(10000),
         });
         if (!response.ok) throw new ProviderError(`News provider returned ${response.status}`, response.status);
@@ -351,7 +363,7 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
           return { title: field("title"), link: field("link"), published: field("pubDate"), source: field("source") };
         });
         if (!items.length) throw new Error("News feed empty");
-        return result(type, "Google News", { query, items });
+        return result(type, "Google News", { query, country, items });
       } catch {
         const xml = await feed("https://feeds.bbci.co.uk/news/world/rss.xml");
         const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 10).map((match) => {
