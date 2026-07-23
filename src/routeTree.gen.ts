@@ -16,6 +16,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedGlobeRouteImport } from './routes/_authenticated/globe'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedBriefingRouteImport } from './routes/_authenticated/briefing'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
 
 const AuthRoute = AuthRouteImport.update({
@@ -52,6 +53,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBriefingRoute = AuthenticatedBriefingRouteImport.update({
+  id: '/briefing',
+  path: '/briefing',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAlertsRoute = AuthenticatedAlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
@@ -62,6 +68,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/alerts': typeof AuthenticatedAlertsRoute
+  '/briefing': typeof AuthenticatedBriefingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/globe': typeof AuthenticatedGlobeRoute
   '/history': typeof AuthenticatedHistoryRoute
@@ -71,6 +78,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/alerts': typeof AuthenticatedAlertsRoute
+  '/briefing': typeof AuthenticatedBriefingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/globe': typeof AuthenticatedGlobeRoute
   '/history': typeof AuthenticatedHistoryRoute
@@ -82,6 +90,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
+  '/_authenticated/briefing': typeof AuthenticatedBriefingRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/globe': typeof AuthenticatedGlobeRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
@@ -93,6 +102,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/alerts'
+    | '/briefing'
     | '/dashboard'
     | '/globe'
     | '/history'
@@ -102,6 +112,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/alerts'
+    | '/briefing'
     | '/dashboard'
     | '/globe'
     | '/history'
@@ -112,6 +123,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/alerts'
+    | '/_authenticated/briefing'
     | '/_authenticated/dashboard'
     | '/_authenticated/globe'
     | '/_authenticated/history'
@@ -175,6 +187,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/briefing': {
+      id: '/_authenticated/briefing'
+      path: '/briefing'
+      fullPath: '/briefing'
+      preLoaderRoute: typeof AuthenticatedBriefingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/alerts': {
       id: '/_authenticated/alerts'
       path: '/alerts'
@@ -187,6 +206,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRoute
+  AuthenticatedBriefingRoute: typeof AuthenticatedBriefingRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedGlobeRoute: typeof AuthenticatedGlobeRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
@@ -195,6 +215,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAlertsRoute: AuthenticatedAlertsRoute,
+  AuthenticatedBriefingRoute: AuthenticatedBriefingRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedGlobeRoute: AuthenticatedGlobeRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
