@@ -1,12 +1,24 @@
 // Small formatting helpers for timezone-aware dates and unit conversion.
 
+const tzValidityCache = new Map<string, boolean>();
+export function isValidTz(tz: string | null | undefined): tz is string {
+  if (!tz || typeof tz !== "string") return false;
+  const cached = tzValidityCache.get(tz);
+  if (cached !== undefined) return cached;
+  let ok = false;
+  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }).format(new Date()); ok = true; } catch { ok = false; }
+  tzValidityCache.set(tz, ok);
+  return ok;
+}
+
 export function formatInTz(value: unknown, tz?: string | null): string {
   if (value == null || value === "") return "—";
   const date = new Date(value as string | number);
   if (Number.isNaN(date.getTime())) return "—";
+  const timeZone = isValidTz(tz) ? tz : undefined;
   try {
     return new Intl.DateTimeFormat([], {
-      timeZone: tz || undefined,
+      timeZone,
       year: "numeric", month: "short", day: "2-digit",
       hour: "2-digit", minute: "2-digit",
     }).format(date);
@@ -16,12 +28,23 @@ export function formatInTz(value: unknown, tz?: string | null): string {
 }
 
 export function formatTimeInTz(tz: string, at: Date = new Date()): string {
+  if (!isValidTz(tz)) return "—";
   try {
     return new Intl.DateTimeFormat([], {
       timeZone: tz, hour: "2-digit", minute: "2-digit", second: "2-digit",
     }).format(at);
   } catch {
-    return at.toLocaleTimeString();
+    return "—";
+  }
+}
+
+export function formatOffsetLabel(tz: string, at: Date = new Date()): string {
+  if (!isValidTz(tz)) return "";
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "shortOffset" }).formatToParts(at);
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  } catch {
+    return "";
   }
 }
 
