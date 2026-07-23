@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Children, useEffect, useRef, useState, type ReactNode } from "react";
 import { ClientOnly } from "@tanstack/react-router";
 import RGL, {
   WidthProvider,
@@ -39,6 +39,7 @@ function ClientGrid({
 }) {
   const [pending, setPending] = useState<Layout | null>(null);
   const lastSaved = useRef("");
+  const renderedChildren = Children.toArray(children);
   useEffect(() => {
     if (!pending) return;
     const t = setTimeout(() => {
@@ -63,7 +64,11 @@ function ClientGrid({
       onLayoutChange={(next: Layout) => setPending(next)}
       compactType="vertical"
     >
-      {children}
+      {items.map((item, index) => (
+        <div key={item.i} data-grid={item}>
+          {renderedChildren[index]}
+        </div>
+      ))}
     </ResponsiveGrid>
   );
 }
