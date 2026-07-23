@@ -26,7 +26,7 @@ export default function GlobeInner(props: GlobeInnerProps = {}) {
   return <GlobeCanvas {...props} />;
 }
 
-function GlobeCanvas() {
+function GlobeCanvas({ historicalDate, historicalImageUrl, historicalQuakes, flyTo }: GlobeInnerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const globeRef = useRef<any>(null);
   const [ready, setReady] = useState(false);
