@@ -36,6 +36,18 @@ async function json(url: string) {
   return response.json() as Promise<any>;
 }
 
+async function feed(url: string) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/atom+xml, application/rss+xml, application/xml, text/xml",
+      "User-Agent": "OmniSphere global-awareness-dashboard/2.0",
+    },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new ProviderError(`Feed provider returned ${response.status}`, response.status);
+  return response.text();
+}
+
 async function jsonWithFallback(primary: string, fallback?: string) {
   try {
     return await json(primary);
@@ -62,10 +74,40 @@ function decodeXml(value: string) {
     .trim();
 }
 
+function issPositionFromElements(element: Record<string, unknown>, at = new Date()) {
+  const epoch = new Date(String(element.EPOCH));
+  const meanMotion = number(element.MEAN_MOTION, 15.5);
+  const eccentricity = number(element.ECCENTRICITY, 0.0007);
+  const inclination = number(element.INCLINATION, 51.64) * Math.PI / 180;
+  const ascendingNode = number(element.RA_OF_ASC_NODE, 0) * Math.PI / 180;
+  const argumentOfPerigee = number(element.ARG_OF_PERICENTER, 0) * Math.PI / 180;
+  const elapsedSeconds = (at.getTime() - epoch.getTime()) / 1000;
+  const meanAnomaly = (number(element.MEAN_ANOMALY, 0) * Math.PI / 180 + meanMotion * 2 * Math.PI * elapsedSeconds / 86400) % (2 * Math.PI);
+  let eccentricAnomaly = meanAnomaly;
+  for (let step = 0; step < 7; step += 1) eccentricAnomaly = meanAnomaly + eccentricity * Math.sin(eccentricAnomaly);
+  const semiMajorAxis = Math.cbrt(398600.4418 / (meanMotion * 2 * Math.PI / 86400) ** 2);
+  const orbitalX = semiMajorAxis * (Math.cos(eccentricAnomaly) - eccentricity);
+  const orbitalY = semiMajorAxis * Math.sqrt(1 - eccentricity ** 2) * Math.sin(eccentricAnomaly);
+  const cosO = Math.cos(ascendingNode), sinO = Math.sin(ascendingNode);
+  const cosI = Math.cos(inclination), sinI = Math.sin(inclination);
+  const cosW = Math.cos(argumentOfPerigee), sinW = Math.sin(argumentOfPerigee);
+  const x = (cosO * cosW - sinO * sinW * cosI) * orbitalX + (-cosO * sinW - sinO * cosW * cosI) * orbitalY;
+  const y = (sinO * cosW + cosO * sinW * cosI) * orbitalX + (-sinO * sinW + cosO * cosW * cosI) * orbitalY;
+  const z = sinW * sinI * orbitalX + cosW * sinI * orbitalY;
+  const julianDate = at.getTime() / 86400000 + 2440587.5;
+  const daysSinceJ2000 = julianDate - 2451545;
+  const greenwichAngle = ((280.46061837 + 360.98564736629 * daysSinceJ2000) % 360) * Math.PI / 180;
+  const longitude = Math.atan2(y, x) - greenwichAngle;
+  const wrappedLongitude = ((longitude * 180 / Math.PI + 540) % 360) - 180;
+  const radius = Math.hypot(x, y, z);
+  return { latitude: Math.asin(z / radius) * 180 / Math.PI, longitude: wrappedLongitude, altitude: radius - 6371, velocity: meanMotion * 2 * Math.PI * semiMajorAxis / 24 };
+}
+
 const stableSettings = (settings: WidgetSettings) => Object.fromEntries(Object.entries(settings).sort(([a], [b]) => a.localeCompare(b)));
 
 export async function fetchWidgetData(type: string, settings: WidgetSettings): Promise<WidgetDataResult> {
-  const cacheKey = `${type}:${JSON.stringify(stableSettings(settings))}`;
+  const cacheVersion = type === "iss" ? "v3:" : "";
+  const cacheKey = `${cacheVersion}${type}:${JSON.stringify(stableSettings(settings))}`;
   const now = Date.now();
   let cached = providerCache.get(cacheKey);
   if (!cached) {
@@ -139,26 +181,51 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
       return result(type, "USGS", { minMagnitude: min, events });
     }
     case "iss": {
-      const [position, crew] = await Promise.all([
-        json("https://api.wheretheiss.at/v1/satellites/25544"),
-        json("https://corquaid.github.io/international-space-station-APIs/JSON/people-in-space.json").catch(() => ({ number: null, people: [] })),
-      ]);
-      return result(type, "Where The ISS At", { position, crew });
+      const crewPromise = json("https://corquaid.github.io/international-space-station-APIs/JSON/people-in-space.json").catch(() => ({ number: null, people: [] }));
+      try {
+        const [position, crew] = await Promise.all([json("https://api.wheretheiss.at/v1/satellites/25544"), crewPromise]);
+        return result(type, "Where The ISS At", { position, crew });
+      } catch {
+        const [records, crew] = await Promise.all([json("https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=JSON"), crewPromise]);
+        if (!records?.[0]) throw new Error("ISS orbital elements unavailable");
+        return result(type, "CelesTrak orbital model", { position: issPositionFromElements(records[0]), crew });
+      }
     }
     case "spacex": {
-      const data = await jsonWithFallback("https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=10", "https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=3");
-      const next = (data.results ?? []).find((launch: any) => /spacex/i.test(`${launch.launch_service_provider?.name ?? ""} ${launch.name ?? ""}`)) ?? data.results?.[0];
-      return result(type, "Launch Library 2", next ?? null);
+      try {
+        const data = await json("https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=10");
+        const next = (data.results ?? []).find((launch: any) => /spacex/i.test(`${launch.launch_service_provider?.name ?? ""} ${launch.name ?? ""}`)) ?? data.results?.[0];
+        return result(type, "Launch Library 2", next ?? null);
+      } catch {
+        const launches = await json("https://fdo.rocketlaunch.live/json/launches/next/5");
+        const next = (launches.result ?? []).find((launch: any) => /spacex/i.test(launch.provider?.name ?? "")) ?? launches.result?.[0];
+        return result(type, "RocketLaunch.Live", next ? { name: next.name, net: next.t0 ?? next.win_open, mission: { description: next.mission_description ?? next.launch_description }, status: { description: next.launch_description } } : null);
+      }
     }
     case "apod": {
       const key = process.env.NASA_API_KEY || "DEMO_KEY";
-      return result(type, "NASA", await json(`https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(key)}&thumbs=true`));
+      try {
+        return result(type, "NASA", await json(`https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(key)}&thumbs=true`));
+      } catch {
+        const xml = await feed("https://apod.nasa.gov/apod.rss");
+        const item = xml.match(/<item>([\s\S]*?)<\/item>/)?.[1] ?? "";
+        const field = (name: string) => decodeXml(item.match(new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`))?.[1] ?? "");
+        const image = item.match(/<enclosure[^>]+url=["']([^"']+)/)?.[1];
+        return result(type, "NASA APOD feed", { title: field("title"), explanation: field("description"), url: image, hdurl: field("link") });
+      }
     }
     case "mars": {
       const key = process.env.NASA_API_KEY || "DEMO_KEY";
       const rover = text(settings.rover, "curiosity").toLowerCase().replace(/[^a-z]/g, "");
-      const data = await json(`https://api.nasa.gov/mars-photos/api/v1/rovers/${rover}/latest_photos?api_key=${encodeURIComponent(key)}`);
-      return result(type, "NASA", { rover, photos: (data.latest_photos ?? []).slice(0, 8) });
+      try {
+        const data = await json(`https://api.nasa.gov/mars-photos/api/v1/rovers/${rover}/latest_photos?api_key=${encodeURIComponent(key)}`);
+        if (!(data.latest_photos ?? []).length) throw new Error("No recent rover images");
+        return result(type, "NASA", { rover, photos: data.latest_photos.slice(0, 8) });
+      } catch {
+        const archive = await json(`https://images-api.nasa.gov/search?q=${encodeURIComponent(`${rover} mars rover`)}&media_type=image&page_size=8`);
+        const photos = (archive.collection?.items ?? []).map((item: any, index: number) => ({ id: item.data?.[0]?.nasa_id ?? index, img_src: item.links?.find((link: any) => link.render === "image")?.href, earth_date: item.data?.[0]?.date_created?.slice(0, 10), rover: { name: rover }, camera: { name: "NASA", full_name: item.data?.[0]?.title ?? "Mars rover image" } })).filter((photo: any) => photo.img_src);
+        return result(type, "NASA Image Library", { rover, photos });
+      }
     }
     case "neo": {
       const key = process.env.NASA_API_KEY || "DEMO_KEY";
@@ -185,9 +252,21 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
     }
     case "reddit": {
       const subreddit = text(settings.subreddit, "worldnews").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30);
-      const data = await jsonWithFallback(`https://www.reddit.com/r/${subreddit}/hot.json?limit=12&raw_json=1`, `https://www.reddit.com/r/${subreddit}/new.json?limit=12&raw_json=1`);
-      const posts = (data.data?.children ?? []).map((p: any) => ({ id: p.data.id, title: p.data.title, score: p.data.score, comments: p.data.num_comments, url: `https://reddit.com${p.data.permalink}` }));
-      return result(type, "Reddit", { subreddit, posts });
+      try {
+        const xml = await feed(`https://www.reddit.com/r/${subreddit}/hot.rss?limit=12`);
+        const posts = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].slice(0, 12).map((match, index) => {
+          const block = match[1];
+          const field = (name: string) => decodeXml(block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`))?.[1] ?? "");
+          const href = block.match(/<link[^>]+href=["']([^"']+)/)?.[1] ?? "";
+          return { id: field("id") || `${subreddit}-${index}`, title: field("title"), score: null, comments: null, url: href };
+        }).filter((post) => post.title && post.url);
+        if (!posts.length) throw new Error("Reddit feed returned no posts");
+        return result(type, "Reddit RSS", { subreddit, posts });
+      } catch {
+        const data = await json(`https://old.reddit.com/r/${subreddit}/hot.json?limit=12&raw_json=1`);
+        const posts = (data.data?.children ?? []).map((p: any) => ({ id: p.data.id, title: p.data.title, score: p.data.score, comments: p.data.num_comments, url: `https://reddit.com${p.data.permalink}` }));
+        return result(type, "Reddit", { subreddit, posts });
+      }
     }
     case "crypto": {
       const coins = text(settings.coins, "bitcoin,ethereum,solana").toLowerCase().replace(/[^a-z0-9,-]/g, "").slice(0, 100);

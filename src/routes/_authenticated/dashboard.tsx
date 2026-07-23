@@ -141,6 +141,7 @@ function Dashboard() {
               <div key={w.id} data-grid={{ i: w.id, x: w.x, y: w.y, w: w.w, h: w.h }}>
                 <WidgetShell
                   title={meta?.label ?? w.widget_type}
+                  type={w.widget_type}
                   onRemove={() => delMut.mutate(w.id)}
                   removeIcon={<Trash2 className="h-3.5 w-3.5" />}
                 >

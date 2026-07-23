@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, ExternalLink, Loader2, RefreshCw, Save, Settings2, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, Cloud, Coins, ExternalLink, Github, Globe2, MessageSquare, Newspaper, Orbit, RefreshCw, Rocket, Save, Satellite, Settings2, TrendingDown, TrendingUp, Wind, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { getWidgetData } from "@/lib/widget-data.functions";
@@ -15,6 +15,22 @@ import { getMyProfile } from "@/lib/profile.functions";
 type Props = { id: string; type: string; settings: unknown };
 
 const FORECASTABLE = new Set(["weather", "aqi", "earthquakes", "crypto"]);
+const WIDGET_STATES: Record<string, { icon: LucideIcon; unavailable: string; hint: string }> = {
+  weather: { icon: Cloud, unavailable: "Weather signal interrupted", hint: "Keeping your last forecast ready" },
+  aqi: { icon: Wind, unavailable: "Air sensor network paused", hint: "Air readings will resume automatically" },
+  earthquakes: { icon: Activity, unavailable: "Seismic feed is quiet", hint: "Reconnecting to the global sensor network" },
+  iss: { icon: Satellite, unavailable: "Orbital telemetry interrupted", hint: "Reacquiring the station signal" },
+  spacex: { icon: Rocket, unavailable: "Launch feed is delayed", hint: "The next mission update is queued" },
+  apod: { icon: Orbit, unavailable: "Deep-space image delayed", hint: "NASA’s daily image will return shortly" },
+  mars: { icon: Orbit, unavailable: "Mars relay unavailable", hint: "Waiting for the next rover downlink" },
+  neo: { icon: Orbit, unavailable: "Object tracking paused", hint: "Near-Earth monitoring will retry automatically" },
+  news: { icon: Newspaper, unavailable: "Headline feed interrupted", hint: "Reconnecting to global news sources" },
+  reddit: { icon: MessageSquare, unavailable: "Reddit feed is unavailable", hint: "The community feed will retry automatically" },
+  crypto: { icon: Coins, unavailable: "Market feed interrupted", hint: "Last prices remain protected in cache" },
+  fx: { icon: Coins, unavailable: "Currency market unavailable", hint: "Exchange rates will refresh automatically" },
+  countries: { icon: Globe2, unavailable: "Country data unavailable", hint: "The atlas service will retry shortly" },
+  github: { icon: Github, unavailable: "Repository feed paused", hint: "Reconnecting to GitHub trends" },
+};
 
 const asSettings = (value: unknown): WidgetSettings =>
   value && typeof value === "object" && !Array.isArray(value) ? value as WidgetSettings : {};
@@ -60,6 +76,8 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
 
   const anomaly = useMemo(() => scoreWidget(type, query.data?.data), [type, query.data]);
   const retryBlocked = Boolean(query.data?.retryAt && new Date(query.data.retryAt).getTime() > Date.now());
+  const state = WIDGET_STATES[type] ?? { icon: Activity, unavailable: "Live source unavailable", hint: "Connection will retry automatically" };
+  const StateIcon = state.icon;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -80,25 +98,26 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
       {editing ? (
         <SettingsForm type={type} draft={draft} setDraft={setDraft} onSave={() => save.mutate()} saving={save.isPending} />
       ) : query.isLoading ? (
-        <div className="grid flex-1 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+        <div className="widget-skeleton flex flex-1 flex-col justify-end gap-3" aria-label="Loading live data"><div className="h-20 rounded-lg" /><div className="h-3 w-2/3 rounded-full" /><div className="h-3 w-1/3 rounded-full" /></div>
       ) : query.isError || query.data?.error ? (
-        <div className="grid flex-1 place-items-center text-center">
-          <div className="max-w-xs">
-            <div className="error-orb mx-auto grid h-12 w-12 place-items-center rounded-2xl"><AlertTriangle className="h-5 w-5 text-neon-amber" /></div>
-            <p className="mt-4 text-sm font-semibold">{query.data?.status === "rate-limited" ? "Provider is cooling down" : "Live source unavailable"}</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{query.data?.error ?? (query.error as Error)?.message}</p>
-            {query.data?.retryAt && <p className="mt-2 text-[10px] uppercase text-muted-foreground">Automatic retry after {new Date(query.data.retryAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
-            <button disabled={retryBlocked} onClick={() => query.refetch()} className="liquid-control mt-4 rounded-full px-4 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-40">{retryBlocked ? "Retry scheduled" : "Retry connection"}</button>
+        <div className="flex flex-1 flex-col justify-between py-1">
+          <div className="flex items-start gap-3">
+            <div className="widget-state-icon grid h-10 w-10 shrink-0 place-items-center rounded-xl"><StateIcon className="h-4.5 w-4.5" /></div>
+            <div className="min-w-0"><p className="text-sm font-semibold">{state.unavailable}</p><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{state.hint}</p></div>
+          </div>
+          <div className="mt-4 flex items-end justify-between gap-3 border-t border-glass-border pt-3">
+            <div><p className="text-[9px] font-semibold uppercase text-muted-foreground">{query.data?.status === "rate-limited" ? "Provider cooldown" : "Connection status"}</p>{query.data?.retryAt && <p className="mt-1 text-[10px] text-muted-foreground">Retry {new Date(query.data.retryAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}</div>
+            <button disabled={retryBlocked} onClick={() => query.refetch()} className="liquid-control grid h-8 w-8 shrink-0 place-items-center rounded-full disabled:cursor-not-allowed disabled:opacity-35" aria-label={retryBlocked ? "Retry scheduled" : "Retry connection"}><RefreshCw className="h-3.5 w-3.5" /></button>
           </div>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="widget-content min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
           <WidgetView type={type} data={query.data?.data as any} />
           {FORECASTABLE.has(type) && query.data?.data && <ForecastCard type={type as any} params={settings as any} />}
         </div>
       )}
 
-      {query.data && !editing && <div className="mt-2 flex shrink-0 justify-between border-t border-glass-border pt-2 text-[10px] text-muted-foreground"><span>{query.data.stale ? "Cached · " : ""}{query.data.source}</span><span>{new Date(query.data.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>}
+      {query.data && !query.data.error && !editing && <div className="mt-2 flex shrink-0 justify-between border-t border-glass-border pt-2 text-[10px] text-muted-foreground"><span>{query.data.stale ? "Cached · " : ""}{query.data.source}</span><span>{new Date(query.data.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>}
     </div>
   );
 }
@@ -137,7 +156,7 @@ function WidgetView({ type, data }: { type: string; data: any }) {
     case "neo": return <List items={data} render={(o: any) => <><span className={`h-2 w-2 rounded-full ${o.is_potentially_hazardous_asteroid ? "bg-destructive" : "bg-neon-lime"}`} /><span className="min-w-0 flex-1 truncate">{o.name}</span><span className="text-muted-foreground">{num(o.estimated_diameter?.meters?.estimated_diameter_max)} m</span></>} />;
     case "clocks": return <div className="space-y-2">{data.zones?.map((zone: string) => <div key={zone} className="flex items-center justify-between rounded bg-secondary/50 p-2"><span className="text-xs text-muted-foreground">{zone.replaceAll("_", " ")}</span><span className="font-mono text-lg">{new Intl.DateTimeFormat([], { timeZone: zone, hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(data.now))}</span></div>)}</div>;
     case "news": return <List items={data.items} render={(item: any) => <a href={item.link} target="_blank" rel="noreferrer" className="block w-full"><p className="line-clamp-2 text-xs font-medium">{item.title}</p><p className="mt-1 text-[10px] text-muted-foreground">{item.source || date(item.published)}</p></a>} />;
-    case "reddit": return <List items={data.posts} render={(p: any) => <a href={p.url} target="_blank" rel="noreferrer" className="block w-full"><p className="line-clamp-2 text-xs font-medium">{p.title}</p><p className="mt-1 text-[10px] text-muted-foreground">↑ {num(p.score)} · {num(p.comments)} comments</p></a>} />;
+    case "reddit": return <div><div className="mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4 text-neon-magenta" /><span className="text-xs font-semibold">r/{data.subreddit}</span></div><List items={data.posts} render={(p: any) => <a href={p.url} target="_blank" rel="noreferrer" className="block w-full"><p className="line-clamp-2 text-xs font-medium">{p.title}</p>{p.score != null && <p className="mt-1 text-[10px] text-muted-foreground">↑ {num(p.score)} · {num(p.comments)} comments</p>}</a>} /></div>;
     case "crypto": return <div className="space-y-2">{Object.entries(data).map(([coin, value]: [string, any]) => <div key={coin} className="flex items-center justify-between rounded bg-secondary/50 p-2"><div><p className="text-xs font-semibold capitalize">{coin.replaceAll("-", " ")}</p><p className="text-lg">${num(value.usd, 4)}</p></div><Change value={value.usd_24h_change} /></div>)}</div>;
     case "fx": return <div className="grid h-full place-items-center text-center"><div><p className="text-xs text-muted-foreground">{num(data.requestedAmount, 2)} {data.base}</p><p className="my-2 text-4xl font-semibold neon-text">{num(data.rates?.[data.quote], 4)}</p><p className="text-sm">{data.quote}</p><p className="mt-3 text-[10px] text-muted-foreground">Rate date {data.date}</p></div></div>;
     case "countries": return <div><div className="flex items-center gap-3"><img src={data.flags?.svg} alt={data.flags?.alt || `${data.name?.common} flag`} className="h-12 w-16 rounded object-cover" /><div><p className="text-xl font-semibold">{data.name?.common}</p><p className="text-xs text-muted-foreground">{data.name?.official}</p></div></div><div className="mt-4 grid grid-cols-2 gap-2"><Metric label="Capital" value={data.capital?.[0]} /><Metric label="Population" value={num(data.population)} /><Metric label="Region" value={data.region} /><Metric label="Subregion" value={data.subregion} /></div>{data.maps?.googleMaps && <a className={`mt-3 text-xs ${linkClass}`} href={data.maps.googleMaps} target="_blank" rel="noreferrer">Open map <ExternalLink className="h-3 w-3" /></a>}</div>;
