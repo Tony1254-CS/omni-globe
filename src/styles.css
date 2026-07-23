@@ -53,6 +53,14 @@
 }
 
 :root {
+  /* Motion system — Apple-grade easing + timing */
+  --ease-out-quint: cubic-bezier(.22,1,.36,1);
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+  --ease-standard: cubic-bezier(.4,0,.2,1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 380ms;
+
   --radius: 1rem;
 
   /* Deep space canvas */
@@ -239,10 +247,9 @@
 .widget-surface {
   --widget-accent: var(--primary);
   transition:
-    transform 480ms cubic-bezier(.22,1,.36,1),
-    box-shadow 480ms cubic-bezier(.22,1,.36,1),
-    backdrop-filter 320ms ease,
-    border-color 280ms ease;
+    transform var(--dur-base) var(--ease-out-quint),
+    box-shadow var(--dur-base) var(--ease-out-quint),
+    border-color var(--dur-fast) var(--ease-standard);
 }
 .widget-surface[data-widget="weather"], .widget-surface[data-widget="aqi"] { --widget-accent: var(--neon-cyan); }
 .widget-surface[data-widget="earthquakes"], .widget-surface[data-widget="neo"] { --widget-accent: var(--neon-amber); }
@@ -275,19 +282,20 @@
   animation: widget-shimmer 1.8s ease-in-out infinite;
 }
 @keyframes widget-shimmer { to { background-position: -180% 0; } }
-.widget-surface:hover {
-  transform: translateY(-3px);
-  backdrop-filter: blur(46px) saturate(190%) brightness(1.07);
-  box-shadow:
-    0 1px 0 oklch(1 0 0 / 0.34) inset,
-    0 -1px 0 oklch(0 0 0 / 0.32) inset,
-    0 0 0 1px color-mix(in oklab, var(--widget-accent) 30%, transparent) inset,
-    0 44px 100px -42px oklch(0 0 0 / 0.95),
-    0 0 60px color-mix(in oklab, var(--widget-accent) 18%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .widget-surface:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 oklch(1 0 0 / 0.34) inset,
+      0 -1px 0 oklch(0 0 0 / 0.32) inset,
+      0 0 0 1px color-mix(in oklab, var(--widget-accent) 30%, transparent) inset,
+      0 30px 70px -32px oklch(0 0 0 / 0.9),
+      0 0 44px color-mix(in oklab, var(--widget-accent) 16%, transparent);
+  }
 }
 .widget-surface:active {
-  transform: translateY(-1px) scale(0.995);
-  transition-duration: 180ms;
+  transform: translateY(0) scale(0.995);
+  transition-duration: var(--dur-fast);
 }
 
 /* Specular sheen — subtle highlight strip that drifts on hover */
@@ -312,7 +320,7 @@
       oklch(1 0 0 / 0.08) 82%,
       transparent 100%);
   transform: translateX(-18%);
-  transition: transform 900ms cubic-bezier(.22,1,.36,1), opacity 400ms ease;
+  transition: transform var(--dur-slow) var(--ease-out-quint), opacity var(--dur-base) var(--ease-standard);
   opacity: 0.85;
 }
 .glass-specular::after {
