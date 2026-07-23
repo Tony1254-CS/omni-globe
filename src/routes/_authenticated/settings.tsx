@@ -227,6 +227,84 @@ function SettingsPage() {
           ))}
         </ul>
       </section>
+
+      <MilestonesSection />
     </div>
+  );
+}
+
+function MilestonesSection() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listMilestones);
+  const addFn = useServerFn(addMilestone);
+  const delFn = useServerFn(deleteMilestone);
+
+  const { data: items = [] } = useQuery({ queryKey: ["milestones"], queryFn: () => listFn() });
+
+  const [label, setLabel] = useState("");
+  const [date, setDate] = useState("");
+  const [kind, setKind] = useState("birthday");
+
+  const addMut = useMutation({
+    mutationFn: () => addFn({ data: { label, occurred_at: date, kind } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["milestones"] });
+      toast.success("Milestone added");
+      setLabel(""); setDate("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const delMut = useMutation({
+    mutationFn: (id: string) => delFn({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["milestones"] }),
+  });
+
+  return (
+    <section className="glass p-6">
+      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+        <Sparkles className="h-4 w-4 text-neon-purple" /> Personal milestones
+      </h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Birthday, graduation, wedding — the Time Machine narrates what the world was doing on each date.
+      </p>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!label || !date) { toast.error("Label and date required"); return; }
+          addMut.mutate();
+        }}
+        className="mt-4 grid gap-2 md:grid-cols-[1fr_140px_140px_auto]"
+      >
+        <input placeholder="e.g. My birthday" value={label} onChange={(e) => setLabel(e.target.value)} className="rounded-lg border border-glass-border bg-input px-3 py-2 text-sm outline-none focus:border-primary" />
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} max={new Date().toISOString().slice(0, 10)} className="rounded-lg border border-glass-border bg-input px-3 py-2 text-sm outline-none focus:border-primary" />
+        <select value={kind} onChange={(e) => setKind(e.target.value)} className="rounded-lg border border-glass-border bg-input px-3 py-2 text-sm outline-none focus:border-primary">
+          <option value="birthday">Birthday</option>
+          <option value="graduation">Graduation</option>
+          <option value="wedding">Wedding</option>
+          <option value="career">Career</option>
+          <option value="other">Other</option>
+        </select>
+        <button type="submit" disabled={addMut.isPending} className="flex items-center justify-center gap-1 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:brightness-110 disabled:opacity-60">
+          <Plus className="h-4 w-4" /> Add
+        </button>
+      </form>
+
+      <ul className="mt-4 divide-y divide-glass-border">
+        {items.length === 0 && <li className="py-6 text-center text-xs text-muted-foreground">No milestones yet.</li>}
+        {items.map((m: any) => (
+          <li key={m.id} className="flex items-center justify-between py-2">
+            <div className="flex items-center gap-3 text-sm">
+              <span className="rounded bg-primary/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-primary">{m.kind}</span>
+              <span className="font-medium">{m.label}</span>
+              <span className="text-xs text-muted-foreground font-mono">{m.occurred_at}</span>
+            </div>
+            <button onClick={() => delMut.mutate(m.id)} className="rounded p-1 text-muted-foreground transition hover:bg-destructive/20 hover:text-destructive" aria-label="Remove">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
