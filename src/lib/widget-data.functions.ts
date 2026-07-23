@@ -12,5 +12,15 @@ export const getWidgetData = createServerFn({ method: "POST" })
   }).parse(input))
   .handler(async ({ data }) => {
     const { fetchWidgetData } = await import("./widget-data.server");
-    return fetchWidgetData(data.type, data.settings);
+    try {
+      return await fetchWidgetData(data.type, data.settings);
+    } catch (err) {
+      return {
+        type: data.type,
+        source: "error",
+        updatedAt: new Date().toISOString(),
+        data: null,
+        error: err instanceof Error ? err.message : "Failed to load data",
+      };
+    }
   });
