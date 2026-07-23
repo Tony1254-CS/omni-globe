@@ -1,43 +1,35 @@
-## Widget reliability repair
+## History repair plan
 
-The screenshot is accurate: several cards still do not have usable data. The backend cache confirms the main defects:
-- SpaceX is stored as a successful `live` result even though its cached payload is `null`, so the card renders blank.
-- Air Quality has no successful warmed cache row.
-- Warmed cache keys do not match many real widget settings (for example custom locations and `useGlobalLocation`), so the global warmer does not help those cards.
-- The “Reddit” card is actually Hacker News data but is still labelled and configured as Reddit.
-- APOD data in the database is now valid, but the UI needs to sanitize legacy feed markup and handle image/text layouts safely.
-- The refresh endpoint exists, but creating an endpoint alone does not guarantee regular refreshes.
+### 1. Make the controls reliable
+- Move dataset, date range, coordinates, coin, and magnitude into validated URL search parameters so selections persist and navigation/refetches are deterministic.
+- Replace continuous requests while dragging/typing with draft controls plus an explicit **Apply** action; show a clear updating state and disable Apply until values change.
+- Validate latitude, longitude, coin ID, magnitude, and date range; add **Reset** and retry behavior.
 
-### Implementation
-1. **Reject empty provider responses**
-   - Add per-widget payload validation before any response is marked `live` or written to cache.
-   - Treat `null`, empty launch lists, empty article lists, and missing required fields as provider failures.
-   - Never overwrite a valid stale cache entry with an empty response.
+### 2. Add actual personal history
+- Add an authenticated history server function that reads the signed-in user’s existing records from:
+  - alert triggers/checks
+  - automation runs
+  - AI agent runs
+  - device readings
+  - journal entries
+  - personal milestones
+  - widget creation/updates
+- Normalize these records into a chronological activity feed with category filters, date range, status, title, summary, and timestamp.
+- Keep all reads user-scoped through the existing authenticated backend and row-level access rules; no schema change is required.
 
-2. **Fix each broken card shown**
-   - Air Quality: add a reliable local fallback derived from weather/air components when the primary air-quality endpoint fails.
-   - SpaceX: normalize both launch providers correctly and add a stable upcoming-launch fallback; require a launch name and date before caching.
-   - Near-Earth Objects: add a keyless NASA small-body fallback and validate that objects exist.
-   - APOD: sanitize encoded HTML, preserve readable plain text, and correctly distinguish image/video media.
-   - News: keep a real news fallback rather than silently presenting technology-only stories as world news.
-   - Community feed: rename the current Hacker News-backed “Reddit” widget to “Community News” throughout the picker, settings, card header, and source text so the UI is honest.
+### 3. Rebuild the History screen
+- Add two clear views:
+  - **My Activity** — real personal timeline with summary counters and useful empty states.
+  - **Global Trends** — existing weather, crypto, and earthquake charts with repaired controls.
+- Use distinct timeline/event visuals by category instead of presenting every record identically.
+- Keep charts responsive and display the active source, selected range, point count, and last refresh time.
 
-3. **Make cache keys reusable**
-   - Canonicalize settings by widget type, excluding presentation-only fields such as `label` and `useGlobalLocation`.
-   - Key location widgets by rounded coordinates so equivalent location settings share cache.
-   - Warm the actual distinct widget configurations currently saved by users, not only a hard-coded London/default list.
+### 4. Harden external trend data
+- Validate provider payloads before rendering.
+- Add bounded caching and graceful fallback/error states so one unavailable provider does not make the whole History page appear broken.
+- Ensure weather, crypto, and earthquake requests use the applied control values and visibly update the chart/source metadata.
 
-4. **Make refresh dependable**
-   - Add stale-while-revalidate behavior that attempts refresh while always retaining the last valid payload.
-   - Trigger a guarded warm-up when a cold cache is encountered, with request deduplication to prevent rate-limit bursts.
-   - Protect the public refresh route with a server secret before it can perform provider-wide refreshes.
-
-5. **Improve card recovery states**
-   - Show skeletons only during a genuine first load.
-   - Show cached content with a small freshness badge when upstream data is unavailable.
-   - For a first-load failure, show the exact source status and an enabled retry action rather than a generic permanent “warming up” message.
-   - Ensure empty data never renders as a visually blank card.
-
-6. **Verify the dashboard end to end**
-   - Test Air Quality, Astronomy, Community News, SpaceX, Near-Earth Objects, and News with the saved configurations visible in the screenshot.
-   - Confirm every card displays meaningful content, refreshes without duplicate provider calls, survives an upstream failure using valid cached data, and remains usable at the current compact widget sizes.
+### 5. Verify end to end
+- Test all three global datasets with changed controls and confirm the plotted data/request parameters change.
+- Test personal history with available user records and confirm filters/date range work.
+- Verify loading, empty, provider-error, retry, desktop, and current mobile viewport states.

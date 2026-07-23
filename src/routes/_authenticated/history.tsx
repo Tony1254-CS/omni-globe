@@ -1,134 +1,59 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
-import { Loader2, Radar } from "lucide-react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, BarChart, Bar } from "recharts";
+import { Activity, Bell, Bot, BrainCircuit, CalendarClock, CloudSun, Coins, Cpu, Gauge, History, RefreshCw, RotateCcw, SlidersHorizontal, Sparkles, Waves } from "lucide-react";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Button } from "@/components/ui/button";
+import { getHistoryData, getPersonalHistory, type ActivityCategory, type ActivityItem } from "@/lib/history-data.functions";
 
-import { getHistoryData } from "@/lib/history-data.functions";
+const kinds = ["weather", "crypto", "earthquakes"] as const;
+type Kind = typeof kinds[number];
+type View = "activity" | "trends";
+const categories = ["all", "alert", "automation", "agent", "device", "journal", "milestone", "widget"] as const;
+const kindMeta = { weather: { label: "Weather", icon: CloudSun }, crypto: { label: "Crypto", icon: Coins }, earthquakes: { label: "Earthquakes", icon: Waves } };
+const categoryMeta: Record<ActivityCategory, { label: string; icon: typeof Bell; className: string }> = {
+  alert: { label: "Alert", icon: Bell, className: "text-destructive bg-destructive/10" }, automation: { label: "Automation", icon: Sparkles, className: "text-primary bg-primary/10" }, agent: { label: "AI agent", icon: BrainCircuit, className: "text-primary bg-primary/10" }, device: { label: "Device", icon: Cpu, className: "text-primary bg-primary/10" }, journal: { label: "Journal", icon: History, className: "text-muted-foreground bg-muted" }, milestone: { label: "Milestone", icon: CalendarClock, className: "text-primary bg-primary/10" }, widget: { label: "Widget", icon: Gauge, className: "text-muted-foreground bg-muted" },
+};
+const defaults = { view: "activity" as View, kind: "weather" as Kind, days: 90, lat: 51.5072, lon: -0.1276, coin: "bitcoin", magnitude: 4.5, category: "all" as typeof categories[number] };
 
 export const Route = createFileRoute("/_authenticated/history")({
-  head: () => ({
-    meta: [
-      { title: "History — OMNISPHERE" },
-      { name: "description", content: "Rewind the planet: historical charts for weather, crypto prices, and seismic activity." },
-      { property: "og:title", content: "OMNISPHERE History — the planet, rewound" },
-      { property: "og:description", content: "Chart historical weather, crypto prices, and earthquakes over any recent window." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  }),
+  validateSearch: (search: Record<string, unknown>) => ({ view: search.view === "trends" ? "trends" as const : "activity" as const, kind: kinds.includes(search.kind as Kind) ? search.kind as Kind : defaults.kind, days: Number.isFinite(Number(search.days)) ? Math.max(1, Math.min(365, Number(search.days))) : defaults.days, lat: Number.isFinite(Number(search.lat)) ? Math.max(-90, Math.min(90, Number(search.lat))) : defaults.lat, lon: Number.isFinite(Number(search.lon)) ? Math.max(-180, Math.min(180, Number(search.lon))) : defaults.lon, coin: ["bitcoin", "ethereum", "solana"].includes(String(search.coin)) ? String(search.coin) : defaults.coin, magnitude: Number.isFinite(Number(search.magnitude)) ? Math.max(1, Math.min(9, Number(search.magnitude))) : defaults.magnitude, category: categories.includes(search.category as typeof categories[number]) ? search.category as typeof categories[number] : defaults.category }),
+  head: () => ({ meta: [{ title: "Activity History | OmniSphere" }, { name: "description", content: "Review your OmniSphere activity and explore reliable global trend archives." }, { property: "og:title", content: "Activity History | OmniSphere" }, { property: "og:description", content: "Review personal activity and global trend archives." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: HistoryPage,
-  errorComponent: ({ error }) => (
-    <div className="glass p-8 text-center text-sm text-muted-foreground">History failed to load: {error.message}</div>
-  ),
-  notFoundComponent: () => <div className="glass p-8 text-center">Not found</div>,
+  errorComponent: ({ error }) => <div className="liquid-glass p-8 text-center text-sm text-muted-foreground">History failed to load: {error.message}</div>,
+  notFoundComponent: () => <div className="liquid-glass p-8 text-center">History not found</div>,
 });
 
-type Kind = "weather" | "crypto" | "earthquakes";
-
-const KIND_META: Record<Kind, { label: string; params: Array<{ key: string; label: string; type: "text" | "number"; default: string | number }> }> = {
-  weather: { label: "Weather (daily mean °C)", params: [{ key: "lat", label: "Lat", type: "number", default: 51.5072 }, { key: "lon", label: "Lon", type: "number", default: -0.1276 }] },
-  crypto: { label: "Crypto price (USD)", params: [{ key: "coin", label: "Coin id", type: "text", default: "bitcoin" }] },
-  earthquakes: { label: "Earthquakes / day", params: [{ key: "minMagnitude", label: "Min magnitude", type: "number", default: 4.5 }] },
-};
-
 function HistoryPage() {
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/history" });
   const historyFn = useServerFn(getHistoryData);
-  const [kind, setKind] = useState<Kind>("weather");
-  const [days, setDays] = useState(30);
-  const meta = KIND_META[kind];
-  const initial = useMemo(() => Object.fromEntries(meta.params.map((p) => [p.key, p.default])), [meta]);
-  const [params, setParams] = useState<Record<string, string | number>>(initial);
+  const activityFn = useServerFn(getPersonalHistory);
+  const [draft, setDraft] = useState(search);
+  useEffect(() => setDraft(search), [search]);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(search);
+  const activity = useQuery({ queryKey: ["personal-history", search.days, search.category], queryFn: () => activityFn({ data: { days: Math.round(search.days), category: search.category } }), enabled: search.view === "activity", staleTime: 60_000 });
+  const trends = useQuery({ queryKey: ["trend-history", search.kind, search.days, search.lat, search.lon, search.coin, search.magnitude], queryFn: () => historyFn({ data: { kind: search.kind, days: search.days, lat: search.lat, lon: search.lon, coin: search.coin, magnitude: search.magnitude } }), enabled: search.view === "trends", staleTime: 10 * 60_000, retry: 1 });
+  const counts = useMemo(() => (activity.data ?? []).reduce<Record<string, number>>((acc, item) => ({ ...acc, [item.category]: (acc[item.category] ?? 0) + 1 }), {}), [activity.data]);
+  const apply = () => navigate({ search: draft, replace: true });
+  const reset = () => { setDraft(defaults); navigate({ search: defaults, replace: true }); };
 
-  function switchKind(k: Kind) {
-    setKind(k);
-    setParams(Object.fromEntries(KIND_META[k].params.map((p) => [p.key, p.default])));
-  }
-
-  const query = useQuery({
-    queryKey: ["history", kind, days, params],
-    queryFn: () => historyFn({ data: { kind, params: { ...params, days } } }),
-    staleTime: 5 * 60_000,
-  });
-
-  const data = query.data;
-  const isBar = kind === "earthquakes";
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">History</h1>
-        <p className="text-sm text-muted-foreground">
-          Time-machine view over the last {days} days. Sourced from open providers — Open-Meteo Archive, CoinGecko, USGS.
-        </p>
-      </div>
-
-      <div className="glass flex flex-wrap items-end gap-3 p-4 text-xs">
-        <label className="block">
-          <span className="mb-1 block uppercase text-muted-foreground">Dataset</span>
-          <select value={kind} onChange={(e) => switchKind(e.target.value as Kind)} className="rounded border border-glass-border bg-secondary/60 px-2 py-2 text-sm">
-            {Object.entries(KIND_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block uppercase text-muted-foreground">Days: {days}</span>
-          <input type="range" min={7} max={kind === "earthquakes" ? 30 : 365} value={days} onChange={(e) => setDays(Number(e.target.value))} className="w-48 accent-primary" />
-        </label>
-        {meta.params.map((p) => (
-          <label key={p.key} className="block">
-            <span className="mb-1 block uppercase text-muted-foreground">{p.label}</span>
-            <input
-              type={p.type}
-              value={String(params[p.key] ?? "")}
-              onChange={(e) => setParams({ ...params, [p.key]: p.type === "number" ? Number(e.target.value) : e.target.value })}
-              className="w-32 rounded border border-glass-border bg-secondary/60 px-2 py-2 text-sm"
-            />
-          </label>
-        ))}
-      </div>
-
-      <div className="glass p-4">
-        {query.isLoading ? (
-          <div className="grid h-[400px] place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-        ) : query.isError || data?.error ? (
-          <div className="grid h-[400px] place-items-center text-center text-sm text-muted-foreground">
-            <div>
-              <Radar className="mx-auto h-8 w-8 text-neon-amber" />
-              <p className="mt-2">Data source unavailable: {(query.error as Error)?.message ?? data?.error}</p>
-              <button onClick={() => query.refetch()} className="mt-3 rounded bg-secondary px-3 py-1 text-xs">Retry</button>
-            </div>
-          </div>
-        ) : (data?.series ?? []).length === 0 ? (
-          <div className="grid h-[400px] place-items-center text-sm text-muted-foreground">No data in the selected window.</div>
-        ) : (
-          <>
-            <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>{data?.source}</span>
-              <span>{data?.series.length} points · unit: {data?.unit ?? ""}</span>
-            </div>
-            <ResponsiveContainer width="100%" height={400}>
-              {isBar ? (
-                <BarChart data={data?.series}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
-                  <XAxis dataKey="t" stroke="#94a3b8" tick={{ fontSize: 11 }} />
-                  <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} />
-                  <Tooltip contentStyle={{ background: "rgba(11,18,36,0.95)", border: "1px solid rgba(148,163,184,0.3)", borderRadius: 8 }} />
-                  <Bar dataKey="v" fill="#38bdf8" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              ) : (
-                <LineChart data={data?.series}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
-                  <XAxis dataKey="t" stroke="#94a3b8" tick={{ fontSize: 11 }} minTickGap={40} />
-                  <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} domain={["auto", "auto"]} />
-                  <Tooltip contentStyle={{ background: "rgba(11,18,36,0.95)", border: "1px solid rgba(148,163,184,0.3)", borderRadius: 8 }} />
-                  <Line type="monotone" dataKey="v" stroke="#38bdf8" strokeWidth={2} dot={false} />
-                </LineChart>
-              )}
-            </ResponsiveContainer>
-          </>
-        )}
-      </div>
-    </div>
-  );
+  return <main className="space-y-5">
+    <header className="liquid-glass p-5 sm:p-7"><div className="flex flex-wrap items-end justify-between gap-5"><div><div className="flex items-center gap-2 text-xs uppercase text-muted-foreground"><History className="h-4 w-4 text-primary" /> Intelligence archive</div><h1 className="mt-2 text-2xl font-semibold sm:text-3xl">History</h1><p className="mt-1 max-w-xl text-sm text-muted-foreground">Your activity, decisions, automations, and the global signals behind them.</p></div><div className="flex rounded-md border border-border bg-muted/40 p-1"><Button size="sm" variant={search.view === "activity" ? "default" : "ghost"} onClick={() => navigate({ search: (prev) => ({ ...prev, view: "activity" }) })}><Activity /> My activity</Button><Button size="sm" variant={search.view === "trends" ? "default" : "ghost"} onClick={() => navigate({ search: (prev) => ({ ...prev, view: "trends" }) })}><Waves /> Global trends</Button></div></div></header>
+    {search.view === "activity" ? <section className="grid gap-4 lg:grid-cols-[240px_1fr]">
+      <aside className="liquid-glass h-fit p-4"><h2 className="text-sm font-medium">Filter activity</h2><label className="mt-4 block text-xs text-muted-foreground">Time range<select aria-label="Activity time range" className="input-glass mt-1 w-full" value={draft.days} onChange={(event) => setDraft({ ...draft, days: Number(event.target.value) })}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option><option value={365}>Last year</option></select></label><label className="mt-3 block text-xs text-muted-foreground">Category<select aria-label="Activity category" className="input-glass mt-1 w-full" value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value as typeof draft.category })}>{categories.map((category) => <option key={category} value={category}>{category === "all" ? "All activity" : categoryMeta[category].label}</option>)}</select></label><Button className="mt-4 w-full" disabled={!dirty} onClick={apply}><SlidersHorizontal /> Apply filters</Button></aside>
+      <div className="space-y-4"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Metric label="Events" value={activity.data?.length ?? 0} /><Metric label="Alerts" value={counts.alert ?? 0} /><Metric label="Automations" value={counts.automation ?? 0} /><Metric label="AI runs" value={counts.agent ?? 0} /></div><div className="liquid-glass min-h-[440px] p-4 sm:p-6"><div className="flex items-center justify-between"><div><h2 className="font-semibold">Chronological activity</h2><p className="text-xs text-muted-foreground">Newest events first · {search.days} day window</p></div><Button size="icon" variant="ghost" title="Refresh activity" onClick={() => activity.refetch()}><RefreshCw className={activity.isFetching ? "animate-spin" : ""} /></Button></div>{activity.isLoading ? <Loading label="Loading your activity…" /> : activity.isError ? <ErrorState message={activity.error.message} retry={() => activity.refetch()} /> : !activity.data?.length ? <EmptyState /> : <div className="mt-6 space-y-1">{activity.data.map((item) => <ActivityRow key={item.id} item={item} />)}</div>}</div></div>
+    </section> : <section className="grid gap-4 lg:grid-cols-[260px_1fr]">
+      <aside className="liquid-glass h-fit p-4"><h2 className="text-sm font-medium">Trend controls</h2><div className="mt-3 grid grid-cols-3 gap-1">{kinds.map((kind) => { const Icon = kindMeta[kind].icon; return <Button key={kind} size="sm" title={kindMeta[kind].label} variant={draft.kind === kind ? "default" : "ghost"} onClick={() => setDraft({ ...draft, kind })}><Icon /><span className="sr-only">{kindMeta[kind].label}</span></Button>; })}</div><label className="mt-4 block text-xs text-muted-foreground">Range<select aria-label="Trend time range" className="input-glass mt-1 w-full" value={draft.days} onChange={(event) => setDraft({ ...draft, days: Number(event.target.value) })}><option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option><option value={365}>1 year</option></select></label>{draft.kind === "weather" && <><NumberField label="Latitude" value={draft.lat} min={-90} max={90} onChange={(lat) => setDraft({ ...draft, lat })} /><NumberField label="Longitude" value={draft.lon} min={-180} max={180} onChange={(lon) => setDraft({ ...draft, lon })} /></>}{draft.kind === "crypto" && <label className="mt-3 block text-xs text-muted-foreground">Asset<select aria-label="Crypto asset" className="input-glass mt-1 w-full" value={draft.coin} onChange={(event) => setDraft({ ...draft, coin: event.target.value })}><option value="bitcoin">Bitcoin</option><option value="ethereum">Ethereum</option><option value="solana">Solana</option></select></label>}{draft.kind === "earthquakes" && <NumberField label="Minimum magnitude" value={draft.magnitude} min={1} max={9} step={0.1} onChange={(magnitude) => setDraft({ ...draft, magnitude })} />}<div className="mt-5 grid grid-cols-[1fr_auto] gap-2"><Button disabled={!dirty} onClick={apply}><SlidersHorizontal /> Apply</Button><Button size="icon" variant="outline" title="Reset controls" onClick={reset}><RotateCcw /></Button></div></aside>
+      <div className="liquid-glass min-h-[540px] p-4 sm:p-6">{trends.isLoading ? <Loading label="Loading historical archive…" /> : trends.isError ? <ErrorState message={trends.error.message} retry={() => trends.refetch()} /> : trends.data ? <><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">{trends.data.title}</h2><p className="text-xs text-muted-foreground">{trends.data.subtitle}</p></div><div className="text-right text-xs text-muted-foreground"><p>{trends.data.source}{trends.data.cached ? " · cached" : " · live"}</p><p>{trends.data.points.length} points · {new Date(trends.data.fetchedAt).toLocaleString()}</p></div></div><div className="mt-7 h-[410px]" aria-label={`${trends.data.title} chart`}><ResponsiveContainer width="100%" height="100%"><AreaChart data={trends.data.points} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}><defs><linearGradient id="history-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--primary)" stopOpacity={0.48}/><stop offset="100%" stopColor="var(--primary)" stopOpacity={0.02}/></linearGradient></defs><CartesianGrid stroke="var(--border)" strokeDasharray="3 6" vertical={false}/><XAxis dataKey="t" tickFormatter={(value) => new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" })} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} minTickGap={30}/><YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} width={55}/><Tooltip labelFormatter={(value) => new Date(String(value)).toLocaleString()} contentStyle={{ borderRadius: 8, border: "1px solid var(--border)", background: "var(--popover)", color: "var(--popover-foreground)" }}/><Area type="monotone" dataKey="value" name={search.kind === "crypto" ? "USD" : search.kind === "weather" ? "High °C" : "Magnitude"} stroke="var(--primary)" strokeWidth={2} fill="url(#history-fill)" />{search.kind === "weather" && <Area type="monotone" dataKey="secondary" name="Low °C" stroke="var(--primary)" strokeOpacity={0.55} fill="transparent" strokeWidth={1.5}/>}</AreaChart></ResponsiveContainer></div></> : null}</div>
+    </section>}
+  </main>;
 }
+
+function Metric({ label, value }: { label: string; value: number }) { return <div className="liquid-glass p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div>; }
+function NumberField({ label, value, min, max, step = 0.01, onChange }: { label: string; value: number; min: number; max: number; step?: number; onChange: (value: number) => void }) { return <label className="mt-3 block text-xs text-muted-foreground">{label}<input aria-label={label} type="number" className="input-glass mt-1 w-full" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))}/></label>; }
+function Loading({ label }: { label: string }) { return <div className="grid min-h-[400px] place-items-center text-sm text-muted-foreground"><span className="flex items-center gap-2"><RefreshCw className="h-4 w-4 animate-spin text-primary" />{label}</span></div>; }
+function ErrorState({ message, retry }: { message: string; retry: () => void }) { return <div className="grid min-h-[400px] place-items-center text-center"><div><Activity className="mx-auto h-7 w-7 text-destructive"/><h3 className="mt-3 font-medium">History could not load</h3><p className="mt-1 max-w-sm text-sm text-muted-foreground">{message}</p><Button className="mt-4" variant="outline" onClick={retry}><RefreshCw /> Try again</Button></div></div>; }
+function EmptyState() { return <div className="grid min-h-[400px] place-items-center text-center"><div><Bot className="mx-auto h-8 w-8 text-primary"/><h3 className="mt-3 font-medium">No activity in this window</h3><p className="mt-1 text-sm text-muted-foreground">Agent runs, alerts, automations, readings, milestones, and dashboard changes will appear here.</p></div></div>; }
+function ActivityRow({ item }: { item: ActivityItem }) { const meta = categoryMeta[item.category]; const Icon = meta.icon; return <article className="group grid grid-cols-[40px_1fr] gap-3 rounded-md px-2 py-3 transition-colors hover:bg-muted/40"><div className={`grid h-9 w-9 place-items-center rounded-md ${meta.className}`}><Icon className="h-4 w-4"/></div><div className="min-w-0 border-b border-border/60 pb-3"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-medium">{item.title}</h3><time className="text-xs text-muted-foreground" dateTime={item.occurredAt}>{new Date(item.occurredAt).toLocaleString()}</time></div><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.summary}</p><span className="mt-2 inline-block text-[10px] uppercase text-muted-foreground">{meta.label} · {item.status}</span></div></article>; }
