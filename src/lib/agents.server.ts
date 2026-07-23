@@ -1,5 +1,6 @@
 import { fetchWidgetData } from "./widget-data.server";
-import { buildForecast } from "./forecast.server";
+import { forecastCrypto, forecastWeather, forecastAqi, forecastAftershocks } from "./forecast.server";
+import type { WidgetSettings } from "./widget-data.types";
 
 type SupabaseLike = {
   from: (t: string) => {
