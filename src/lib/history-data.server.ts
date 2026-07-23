@@ -65,7 +65,7 @@ export async function fetchHistory(input: HistoryParams): Promise<HistoryResult>
   const client = publicClient();
   const { data: cached } = await client.from("provider_cache").select("payload, expires_at").eq("cache_key", cacheKey).maybeSingle();
   const stale = cached?.payload as unknown as HistoryResult | undefined;
-  if (stale?.points?.length && new Date(cached.expires_at).getTime() > Date.now()) return { ...stale, cached: true };
+  if (cached && stale?.points?.length && new Date(cached.expires_at).getTime() > Date.now()) return { ...stale, cached: true };
   try {
     const result = await fetchFresh(params);
     await client.from("provider_cache").upsert({ cache_key: cacheKey, payload: result as unknown as Json, expires_at: new Date(Date.now() + 15 * 60_000).toISOString(), created_at: new Date().toISOString() });
