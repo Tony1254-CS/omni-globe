@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Globe2, LayoutDashboard, Settings, Radar, LogOut, Bell, Sparkles, Zap, Bot, Cpu, Trophy, Share2, Sun, Moon, MapPin } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const fetchProfile = useServerFn(getMyProfile);
   const profile = useQuery({ queryKey: ["profile"], queryFn: () => fetchProfile(), staleTime: 5 * 60_000 });
   const [utc, setUtc] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeTimer = useRef<number | null>(null);
   useEffect(() => {
     const update = () => setUtc(new Date().toUTCString().slice(17, 25));
     update();
@@ -46,17 +48,30 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/auth", replace: true });
   }
 
+  const openSidebar = () => {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    setSidebarOpen(true);
+  };
+  const closeSidebar = () => {
+    closeTimer.current = window.setTimeout(() => setSidebarOpen(false), 140);
+  };
+
   return (
-    <div className="flex min-h-screen">
+    <div className="app-canvas flex min-h-screen">
       {/* Desktop collapsible sidebar (fixed, hover-expands) */}
       <aside
-        className="sidebar-rail group/sidebar fixed inset-y-3 left-3 z-40 hidden w-16 shrink-0 flex-col overflow-hidden rounded-lg border border-glass-border bg-glass/70 backdrop-blur-xl transition-[width] duration-300 ease-out hover:w-60 focus-within:w-60 md:flex"
+        onMouseEnter={openSidebar}
+        onMouseLeave={closeSidebar}
+        onFocusCapture={openSidebar}
+        onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) closeSidebar(); }}
+        data-expanded={sidebarOpen}
+        className="sidebar-rail group/sidebar fixed inset-y-4 left-4 z-40 hidden w-[72px] shrink-0 flex-col overflow-hidden rounded-[22px] md:flex"
       >
         <div className="flex items-center gap-2 overflow-hidden px-3 py-6">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg neon-border">
+          <div className="brand-orb grid h-10 w-10 shrink-0 place-items-center rounded-xl">
             <Globe2 className="h-5 w-5 text-primary" />
           </div>
-          <span className="whitespace-nowrap text-sm font-bold tracking-wider opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100 group-focus-within/sidebar:opacity-100">
+          <span className="sidebar-label whitespace-nowrap text-sm font-semibold">
             OMNISPHERE
           </span>
         </div>
@@ -70,14 +85,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
+                  "sidebar-link flex h-11 items-center gap-4 rounded-xl px-3 text-sm",
                   active
-                    ? "bg-primary/15 text-primary neon-border"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                     ? "is-active text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
-                <span className="whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100 group-focus-within/sidebar:opacity-100">
+                <span className="sidebar-label whitespace-nowrap">
                   {item.label}
                 </span>
               </Link>
@@ -86,17 +101,17 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <button
           onClick={signOut}
-          className="m-2 flex items-center gap-3 overflow-hidden rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+           className="sidebar-link m-2 flex h-11 items-center gap-4 overflow-hidden rounded-xl px-3 text-sm text-muted-foreground hover:text-foreground"
         >
           <LogOut className="h-4 w-4 shrink-0" />
-          <span className="whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100 group-focus-within/sidebar:opacity-100">
+          <span className="sidebar-label whitespace-nowrap">
             Sign out
           </span>
         </button>
       </aside>
 
       <div className="min-w-0 flex-1 md:ml-20">
-        <header className="sticky top-0 z-30 grid grid-cols-[minmax(0,1fr)_auto] items-center border-b border-glass-border bg-glass/70 px-4 py-3 backdrop-blur-xl md:px-8">
+        <header className="command-bar sticky top-3 z-30 mx-3 mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-2xl px-4 py-3 md:mx-6 md:px-6">
           <div className="flex items-center gap-2 md:hidden">
             <Globe2 className="h-5 w-5 text-primary" />
             <span className="text-sm font-bold tracking-wider">OMNISPHERE</span>
@@ -109,7 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               onClick={toggle}
               aria-label="Toggle theme"
-              className="rounded-lg border border-glass-border bg-glass p-2 text-muted-foreground transition hover:text-foreground"
+               className="liquid-control rounded-xl p-2 text-muted-foreground transition hover:text-foreground"
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>

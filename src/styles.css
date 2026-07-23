@@ -53,19 +53,19 @@
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 1rem;
 
   /* Deep space canvas */
-  --background: oklch(0.14 0.006 250);
-  --foreground: oklch(0.94 0.012 240);
+  --background: oklch(0.145 0.008 255);
+  --foreground: oklch(0.94 0.012 250);
 
-  --card: oklch(0.205 0.009 250);
+  --card: oklch(0.235 0.012 255 / 72%);
   --card-foreground: oklch(0.97 0.01 240);
   --popover: oklch(0.19 0.008 250);
   --popover-foreground: oklch(0.97 0.01 240);
 
   /* Neon primary = cyan */
-  --primary: oklch(0.77 0.13 220);
+  --primary: oklch(0.77 0.14 226);
   --primary-foreground: oklch(0.14 0.006 250);
 
   --secondary: oklch(0.25 0.012 250);
@@ -89,8 +89,8 @@
   --neon-lime: oklch(0.86 0.20 145);
   --neon-amber: oklch(0.82 0.17 75);
 
-  --glass-bg: oklch(0.205 0.009 250 / 68%);
-  --glass-border: oklch(0.96 0.01 240 / 14%);
+  --glass-bg: oklch(0.24 0.012 255 / 46%);
+  --glass-border: oklch(0.96 0.01 240 / 16%);
   --globe-bg: oklch(0.105 0.008 250);
 
   --chart-1: oklch(0.82 0.17 200);
@@ -129,8 +129,8 @@
   --input: oklch(0.30 0.04 265 / 20%);
   --ring: oklch(0.55 0.17 220);
 
-  --glass-bg: oklch(1 0 0 / 65%);
-  --glass-border: oklch(0.30 0.05 265 / 18%);
+  --glass-bg: oklch(1 0 0 / 52%);
+  --glass-border: oklch(1 0 0 / 72%);
   --globe-bg: oklch(0.12 0.01 250);
 }
 
@@ -139,7 +139,7 @@
   --foreground: oklch(0.94 0.012 240);
 }
 
-:root:not(.dark) body { background-image: linear-gradient(180deg, oklch(0.99 0.003 240), oklch(0.96 0.008 245)); }
+:root:not(.dark) body { background-image: linear-gradient(145deg, oklch(0.985 0.005 245), oklch(0.93 0.018 245)); }
 
 /* React-grid-layout resize handle themed to match glass UI */
 .react-resizable-handle {
@@ -178,7 +178,10 @@
   }
 
   body {
-    background-image: linear-gradient(145deg, oklch(0.11 0.005 250), oklch(0.18 0.01 245));
+    background-image:
+      radial-gradient(ellipse at 8% 0%, oklch(0.36 0.075 240 / 28%), transparent 42%),
+      radial-gradient(ellipse at 100% 38%, oklch(0.27 0.055 275 / 17%), transparent 36%),
+      linear-gradient(145deg, oklch(0.105 0.006 255), oklch(0.17 0.012 250));
     background-attachment: fixed;
     min-height: 100vh;
   }
@@ -188,7 +191,7 @@
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(24px) saturate(135%);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   box-shadow:
     0 1px 0 oklch(1 0 0 / 0.1) inset,
     0 -1px 0 oklch(0 0 0 / 0.25) inset,
@@ -210,11 +213,12 @@
 }
 
 .widget-surface {
-  transition: border-color 180ms ease, box-shadow 240ms ease, transform 240ms ease;
+  transition: border-color 280ms ease, box-shadow 420ms cubic-bezier(.2,.8,.2,1), transform 420ms cubic-bezier(.2,.8,.2,1), background 280ms ease;
 }
 .widget-surface:hover {
-  border-color: color-mix(in oklab, var(--primary) 30%, var(--glass-border));
-  box-shadow: 0 1px 0 oklch(1 0 0 / 0.12) inset, 0 28px 70px -38px oklch(0 0 0 / 0.9);
+  border-color: color-mix(in oklab, var(--primary) 24%, var(--glass-border));
+  box-shadow: 0 1px 0 oklch(1 0 0 / 0.22) inset, 0 34px 80px -38px oklch(0 0 0 / 0.9), 0 0 40px color-mix(in oklab, var(--primary) 7%, transparent);
+  transform: translateY(-2px);
 }
 .react-grid-item.react-grid-placeholder {
   border: 1px solid color-mix(in oklab, var(--primary) 55%, transparent);
@@ -236,7 +240,39 @@
 .react-resizable-handle-e { cursor: ew-resize; right: -4px !important; }
 .react-resizable-handle-w { cursor: ew-resize; left: -4px !important; }
 .react-resizable-handle-s { cursor: ns-resize; bottom: -4px !important; }
-.sidebar-rail { box-shadow: 0 24px 80px -28px oklch(0 0 0 / 0.9), 0 1px 0 oklch(1 0 0 / 0.1) inset; }
+.sidebar-rail {
+  width: 72px;
+  background: color-mix(in oklab, var(--glass-bg) 84%, transparent);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(34px) saturate(165%);
+  box-shadow: 0 30px 90px -30px oklch(0 0 0 / 0.9), 0 1px 0 oklch(1 0 0 / 0.18) inset, -1px 0 0 oklch(1 0 0 / 0.05) inset;
+  transition: width 520ms cubic-bezier(.22,1,.36,1), box-shadow 320ms ease;
+}
+.sidebar-rail[data-expanded="true"] { width: 256px; box-shadow: 0 34px 100px -24px oklch(0 0 0 / 0.92), 0 1px 0 oklch(1 0 0 / 0.2) inset; }
+.sidebar-label { opacity: 0; transform: translateX(-7px); transition: opacity 160ms ease, transform 280ms cubic-bezier(.22,1,.36,1); pointer-events: none; }
+.sidebar-rail[data-expanded="true"] .sidebar-label { opacity: 1; transform: translateX(0); transition-delay: 105ms; }
+.sidebar-link { position: relative; transition: color 220ms ease, background 220ms ease, box-shadow 220ms ease; }
+.sidebar-link:hover { background: color-mix(in oklab, var(--foreground) 6%, transparent); }
+.sidebar-link.is-active { background: color-mix(in oklab, var(--foreground) 8%, transparent); box-shadow: 0 1px 0 oklch(1 0 0 / .1) inset; }
+.sidebar-link.is-active::before { content: ""; position: absolute; left: 0; width: 2px; height: 18px; border-radius: 99px; background: var(--primary); box-shadow: 0 0 14px color-mix(in oklab, var(--primary) 70%, transparent); }
+.brand-orb { background: color-mix(in oklab, var(--primary) 12%, var(--glass-bg)); border: 1px solid color-mix(in oklab, var(--primary) 45%, var(--glass-border)); box-shadow: 0 1px 0 oklch(1 0 0 / .2) inset, 0 0 24px color-mix(in oklab, var(--primary) 18%, transparent); }
+
+.command-bar, .liquid-glass {
+  background: linear-gradient(145deg, color-mix(in oklab, var(--glass-bg) 94%, white 2%), color-mix(in oklab, var(--glass-bg) 92%, transparent));
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(32px) saturate(170%);
+  box-shadow: 0 1px 0 oklch(1 0 0 / .2) inset, 0 -1px 0 oklch(0 0 0 / .24) inset, 0 28px 70px -38px oklch(0 0 0 / .86);
+}
+.glass-specular { position: absolute; z-index: 0; inset: 0; pointer-events: none; border-radius: inherit; overflow: hidden; }
+.glass-specular::before { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, oklch(1 0 0 / .13), transparent 22%, transparent 72%, oklch(1 0 0 / .04)); opacity: .75; }
+.glass-specular::after { content: ""; position: absolute; top: 0; left: 10%; right: 10%; height: 1px; background: linear-gradient(90deg, transparent, oklch(1 0 0 / .65), transparent); }
+.liquid-control { background: color-mix(in oklab, var(--foreground) 5%, transparent); border: 1px solid var(--glass-border); box-shadow: 0 1px 0 oklch(1 0 0 / .14) inset; backdrop-filter: blur(18px) saturate(150%); }
+.liquid-control:hover { background: color-mix(in oklab, var(--foreground) 9%, transparent); box-shadow: 0 1px 0 oklch(1 0 0 / .22) inset, 0 8px 24px -16px oklch(0 0 0 / .8); }
+.primary-glass-button { color: var(--primary-foreground); background: linear-gradient(145deg, color-mix(in oklab, var(--primary) 90%, white 10%), var(--primary)); border: 1px solid color-mix(in oklab, var(--primary) 55%, white); box-shadow: 0 1px 0 oklch(1 0 0 / .5) inset, 0 14px 34px -16px color-mix(in oklab, var(--primary) 70%, transparent); transition: transform 240ms ease, filter 240ms ease; }
+.primary-glass-button:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.error-orb { background: color-mix(in oklab, var(--neon-amber) 9%, transparent); border: 1px solid color-mix(in oklab, var(--neon-amber) 22%, var(--glass-border)); box-shadow: 0 1px 0 oklch(1 0 0 / .14) inset; }
+.resize-readout { position: fixed; z-index: 80; left: 50%; bottom: 28px; transform: translateX(-50%); border: 1px solid var(--glass-border); border-radius: 999px; background: var(--glass-bg); backdrop-filter: blur(20px); padding: 7px 13px; color: var(--foreground); font-size: 11px; font-weight: 700; box-shadow: 0 16px 40px -18px oklch(0 0 0 / .9); }
+.asymmetric-workspace .react-grid-item:first-child .widget-surface { box-shadow: 0 1px 0 oklch(1 0 0 / .24) inset, 0 38px 90px -42px oklch(0 0 0 / .9), 0 0 55px color-mix(in oklab, var(--primary) 6%, transparent); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

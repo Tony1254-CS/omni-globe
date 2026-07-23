@@ -59,6 +59,7 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
   });
 
   const anomaly = useMemo(() => scoreWidget(type, query.data?.data), [type, query.data]);
+  const retryBlocked = Boolean(query.data?.retryAt && new Date(query.data.retryAt).getTime() > Date.now());
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -82,7 +83,13 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
         <div className="grid flex-1 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
       ) : query.isError || query.data?.error ? (
         <div className="grid flex-1 place-items-center text-center">
-           <div><AlertTriangle className="mx-auto h-5 w-5 text-neon-amber" /><p className="mt-2 text-xs font-medium">Live source unavailable</p><p className="mt-1 text-[11px] text-muted-foreground">{query.data?.error ?? (query.error as Error)?.message}</p><button onClick={() => query.refetch()} className="mt-3 rounded bg-secondary px-2 py-1 text-xs">Try again</button></div>
+          <div className="max-w-xs">
+            <div className="error-orb mx-auto grid h-12 w-12 place-items-center rounded-2xl"><AlertTriangle className="h-5 w-5 text-neon-amber" /></div>
+            <p className="mt-4 text-sm font-semibold">{query.data?.status === "rate-limited" ? "Provider is cooling down" : "Live source unavailable"}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{query.data?.error ?? (query.error as Error)?.message}</p>
+            {query.data?.retryAt && <p className="mt-2 text-[10px] uppercase text-muted-foreground">Automatic retry after {new Date(query.data.retryAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
+            <button disabled={retryBlocked} onClick={() => query.refetch()} className="liquid-control mt-4 rounded-full px-4 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-40">{retryBlocked ? "Retry scheduled" : "Retry connection"}</button>
+          </div>
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
@@ -91,7 +98,7 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
         </div>
       )}
 
-      {query.data && !editing && <div className="mt-2 flex shrink-0 justify-between border-t border-glass-border pt-2 text-[10px] text-muted-foreground"><span>{query.data.source}</span><span>{new Date(query.data.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>}
+      {query.data && !editing && <div className="mt-2 flex shrink-0 justify-between border-t border-glass-border pt-2 text-[10px] text-muted-foreground"><span>{query.data.stale ? "Cached · " : ""}{query.data.source}</span><span>{new Date(query.data.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>}
     </div>
   );
 }
