@@ -23,6 +23,10 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
     meta: [
       { title: "Dashboard — OMNISPHERE" },
       { name: "description", content: "Your personal real-time command center." },
+      { property: "og:title", content: "Dashboard — OMNISPHERE" },
+      { property: "og:description", content: "Your personal real-time global awareness command center." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Dashboard,

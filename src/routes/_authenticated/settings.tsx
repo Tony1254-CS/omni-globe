@@ -18,6 +18,10 @@ export const Route = createFileRoute("/_authenticated/settings")({
     meta: [
       { title: "Settings — OMNISPHERE" },
       { name: "description", content: "Profile, units and favourite locations." },
+      { property: "og:title", content: "Settings — OMNISPHERE" },
+      { property: "og:description", content: "Manage profile, units and global location preferences." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: SettingsPage,

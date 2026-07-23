@@ -72,16 +72,17 @@ function GlobeCanvas() {
         .atmosphereAltitude(0.22)
         .showGraticules(false)
         .pointOfView({ lat: 20, lng: 0, altitude: 2.4 });
+      if (cancelled) return;
       globeRef.current = g;
       const controls = g.controls?.();
       if (controls) {
         controls.autoRotate = true;
         controls.autoRotateSpeed = 0.4;
       }
-      setReady(true);
+      if (!cancelled) setReady(true);
 
       ro = new ResizeObserver(() => {
-        if (!containerRef.current) return;
+        if (cancelled || !containerRef.current) return;
         g.width(containerRef.current.clientWidth);
         g.height(containerRef.current.clientHeight);
       });
