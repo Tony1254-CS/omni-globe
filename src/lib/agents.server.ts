@@ -81,11 +81,16 @@ async function callTool(
   supabase: SupabaseLike,
 ): Promise<unknown> {
   if (name === "getWidgetData") {
-    return await fetchWidgetData(String(args.type), (args.settings as Record<string, unknown>) ?? {});
+    return await fetchWidgetData(String(args.type), ((args.settings ?? {}) as unknown) as WidgetSettings);
   }
   if (name === "getForecast") {
-    const raw = await fetchWidgetData(String(args.type), (args.settings as Record<string, unknown>) ?? {});
-    return buildForecast(String(args.type), raw as never);
+    const s = ((args.settings ?? {}) as Record<string, unknown>);
+    const type = String(args.type);
+    if (type === "crypto") return forecastCrypto(String(s.coin ?? "bitcoin"));
+    if (type === "weather") return forecastWeather(Number(s.lat ?? 51.5), Number(s.lon ?? -0.13));
+    if (type === "aqi") return forecastAqi(Number(s.lat ?? 51.5), Number(s.lon ?? -0.13));
+    if (type === "earthquakes") return forecastAftershocks();
+    return { error: `No forecast for ${type}` };
   }
   if (name === "listAlerts") {
     const { data } = await supabase.from("alerts").select("*").eq("enabled", true);
