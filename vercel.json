@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/public/hooks/refresh-widgets",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
