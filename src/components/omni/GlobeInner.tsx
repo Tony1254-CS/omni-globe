@@ -11,8 +11,19 @@ import earthTopology from "@/assets/earth-topology.png";
 type IssPos = { latitude: number; longitude: number; altitude: number; velocity: number };
 type Quake = { id: string; magnitude: number; place: string; time: number; lat: number; lon: number; url: string };
 
-export default function GlobeInner() {
-  return <GlobeCanvas />;
+type HistoricalQuake = { id: string; magnitude: number; place: string; lat: number; lon: number; url: string };
+
+export type GlobeInnerProps = {
+  /** When set, globe renders historical data for this date (YYYY-MM-DD) instead of live layers. */
+  historicalDate?: string | null;
+  historicalImageUrl?: string | null;
+  historicalQuakes?: HistoricalQuake[];
+  /** Fly-to when this changes (used by milestone "Jump"). */
+  flyTo?: { lat: number; lon: number; key: string } | null;
+};
+
+export default function GlobeInner(props: GlobeInnerProps = {}) {
+  return <GlobeCanvas {...props} />;
 }
 
 function GlobeCanvas() {
