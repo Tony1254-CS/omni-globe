@@ -1,11 +1,14 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Globe2, LayoutDashboard, Settings, Radar, LogOut, Bell, Sparkles, Zap, Bot, Cpu, Trophy, Share2, Sun, Moon } from "lucide-react";
-import type { ReactNode } from "react";
+import { Globe2, LayoutDashboard, Settings, Radar, LogOut, Bell, Sparkles, Zap, Bot, Cpu, Trophy, Share2, Sun, Moon, MapPin } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/theme-provider";
+import { getMyProfile } from "@/lib/profile.functions";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -27,6 +30,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { theme, toggle } = useTheme();
+  const fetchProfile = useServerFn(getMyProfile);
+  const profile = useQuery({ queryKey: ["profile"], queryFn: () => fetchProfile(), staleTime: 5 * 60_000 });
+  const [utc, setUtc] = useState("");
+  useEffect(() => {
+    const update = () => setUtc(new Date().toUTCString().slice(17, 25));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -39,7 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen">
       {/* Desktop collapsible sidebar (fixed, hover-expands) */}
       <aside
-        className="group/sidebar fixed inset-y-0 left-0 z-40 hidden w-16 shrink-0 flex-col border-r border-glass-border bg-glass/70 backdrop-blur-xl transition-[width] duration-300 ease-out hover:w-60 focus-within:w-60 md:flex"
+        className="sidebar-rail group/sidebar fixed inset-y-3 left-3 z-40 hidden w-16 shrink-0 flex-col overflow-hidden rounded-lg border border-glass-border bg-glass/70 backdrop-blur-xl transition-[width] duration-300 ease-out hover:w-60 focus-within:w-60 md:flex"
       >
         <div className="flex items-center gap-2 overflow-hidden px-3 py-6">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg neon-border">
@@ -84,14 +96,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </aside>
 
-      <div className="flex-1 min-w-0 md:ml-16">
-        <header className="flex items-center justify-between border-b border-glass-border bg-glass/40 px-4 py-3 backdrop-blur-xl md:px-8">
+      <div className="min-w-0 flex-1 md:ml-20">
+        <header className="sticky top-0 z-30 grid grid-cols-[minmax(0,1fr)_auto] items-center border-b border-glass-border bg-glass/70 px-4 py-3 backdrop-blur-xl md:px-8">
           <div className="flex items-center gap-2 md:hidden">
             <Globe2 className="h-5 w-5 text-primary" />
             <span className="text-sm font-bold tracking-wider">OMNISPHERE</span>
           </div>
-          <div className="hidden text-xs uppercase tracking-widest text-muted-foreground md:block">
-            Command Center
+          <div className="hidden min-w-0 items-center gap-4 md:flex">
+            <span className="text-xs font-semibold uppercase text-muted-foreground">Command Center</span>
+            <span className="flex min-w-0 items-center gap-1.5 truncate text-xs text-foreground"><MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />{profile.data?.home_label ?? "Set global location"}</span>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -102,7 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
             <span className="hidden text-xs text-muted-foreground md:inline">
-              {new Date().toUTCString().slice(17, 25)} UTC
+              {utc || "--:--:--"} UTC
             </span>
           </div>
         </header>

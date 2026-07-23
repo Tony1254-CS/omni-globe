@@ -9,6 +9,8 @@ import { updateWidgetSettings } from "@/lib/widgets.functions";
 import { scoreWidget } from "@/lib/anomaly";
 import { AttentionBadge } from "@/components/omni/AttentionBadge";
 import { ForecastCard } from "@/components/omni/ForecastCard";
+import { LocationSearch } from "@/components/omni/LocationSearch";
+import { getMyProfile } from "@/lib/profile.functions";
 
 type Props = { id: string; type: string; settings: unknown };
 
@@ -24,8 +26,16 @@ const linkClass = "inline-flex items-center gap-1 text-primary hover:underline";
 export function LiveWidget({ id, type, settings: stored }: Props) {
   const qc = useQueryClient();
   const fetchData = useServerFn(getWidgetData);
+  const fetchProfile = useServerFn(getMyProfile);
   const saveSettings = useServerFn(updateWidgetSettings);
-  const settings = useMemo(() => ({ ...(DEFAULT_WIDGET_SETTINGS[type] ?? {}), ...asSettings(stored) }), [stored, type]);
+  const baseSettings = useMemo(() => ({ ...(DEFAULT_WIDGET_SETTINGS[type] ?? {}), ...asSettings(stored) }), [stored, type]);
+  const profile = useQuery({ queryKey: ["profile"], queryFn: () => fetchProfile(), enabled: type === "weather" || type === "aqi", staleTime: 5 * 60_000 });
+  const settings = useMemo(() => {
+    if ((type === "weather" || type === "aqi") && baseSettings.useGlobalLocation !== false && profile.data?.home_lat != null && profile.data?.home_lon != null) {
+      return { ...baseSettings, lat: profile.data.home_lat, lon: profile.data.home_lon, label: profile.data.home_label ?? "Home" };
+    }
+    return baseSettings;
+  }, [baseSettings, profile.data, type]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(settings);
   useEffect(() => setDraft(settings), [settings]);
@@ -70,9 +80,9 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
         <SettingsForm type={type} draft={draft} setDraft={setDraft} onSave={() => save.mutate()} saving={save.isPending} />
       ) : query.isLoading ? (
         <div className="grid flex-1 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
-      ) : query.isError ? (
+      ) : query.isError || query.data?.error ? (
         <div className="grid flex-1 place-items-center text-center">
-          <div><AlertTriangle className="mx-auto h-5 w-5 text-neon-amber" /><p className="mt-2 text-xs font-medium">Live source unavailable</p><p className="mt-1 text-[11px] text-muted-foreground">{query.error.message}</p><button onClick={() => query.refetch()} className="mt-3 rounded bg-secondary px-2 py-1 text-xs">Try again</button></div>
+           <div><AlertTriangle className="mx-auto h-5 w-5 text-neon-amber" /><p className="mt-2 text-xs font-medium">Live source unavailable</p><p className="mt-1 text-[11px] text-muted-foreground">{query.data?.error ?? (query.error as Error)?.message}</p><button onClick={() => query.refetch()} className="mt-3 rounded bg-secondary px-2 py-1 text-xs">Try again</button></div>
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
@@ -93,8 +103,8 @@ function Field({ label, value, onChange, type = "text" }: { label: string; value
 function SettingsForm({ type, draft, setDraft, onSave, saving }: { type: string; draft: WidgetSettings; setDraft: (v: WidgetSettings) => void; onSave: () => void; saving: boolean }) {
   const set = (key: string, value: string | number) => setDraft({ ...draft, [key]: value });
   const fields: Record<string, Array<[string, string, "text" | "number"]>> = {
-    weather: [["label", "Location label", "text"], ["lat", "Latitude", "number"], ["lon", "Longitude", "number"]],
-    aqi: [["label", "Location label", "text"], ["lat", "Latitude", "number"], ["lon", "Longitude", "number"]],
+    weather: [],
+    aqi: [],
     earthquakes: [["minMagnitude", "Minimum magnitude", "number"]],
     clocks: [["zones", "Time zones (comma-separated)", "text"]],
     news: [["query", "News search", "text"]], reddit: [["subreddit", "Subreddit", "text"]],
@@ -103,7 +113,8 @@ function SettingsForm({ type, draft, setDraft, onSave, saving }: { type: string;
     countries: [["country", "Country", "text"]], github: [["language", "Language", "text"]],
     mars: [["rover", "Rover", "text"]], covid: [["country", "Country or all", "text"]],
   };
-  return <div className="space-y-2 overflow-auto">{(fields[type] ?? []).map(([key, label, inputType]) => <Field key={key} label={label} value={draft[key]} type={inputType} onChange={(v) => set(key, v)} />)}<button onClick={onSave} disabled={saving} className="mt-2 inline-flex items-center gap-1.5 rounded bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"><Save className="h-3.5 w-3.5" />Save</button></div>;
+  const locationAware = type === "weather" || type === "aqi";
+  return <div className="space-y-2 overflow-auto">{locationAware && <><label className="flex items-center justify-between rounded-md bg-secondary/60 p-2 text-xs"><span>Use global location</span><input type="checkbox" checked={draft.useGlobalLocation !== false} onChange={(event) => setDraft({ ...draft, useGlobalLocation: event.target.checked })} className="accent-primary" /></label>{draft.useGlobalLocation === false && <LocationSearch onSelect={(location) => setDraft({ ...draft, label: location.label, lat: location.lat, lon: location.lon, timezone: location.timezone })} />}</>}{(fields[type] ?? []).map(([key, label, inputType]) => <Field key={key} label={label} value={draft[key]} type={inputType} onChange={(v) => set(key, v)} />)}<button onClick={onSave} disabled={saving} className="mt-2 inline-flex items-center gap-1.5 rounded bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"><Save className="h-3.5 w-3.5" />Save</button></div>;
 }
 
 function WidgetView({ type, data }: { type: string; data: any }) {

@@ -7,7 +7,7 @@ import { getWidgetData } from "@/lib/widget-data.functions";
 import { listFavourites } from "@/lib/favourites.functions";
 
 type IssPos = { latitude: number; longitude: number; altitude: number; velocity: number };
-type Quake = { id: string; mag: number; place: string; time: number; lat: number; lon: number; url: string };
+type Quake = { id: string; magnitude: number; place: string; time: number; lat: number; lon: number; url: string };
 
 export default function GlobeInner() {
   return <GlobeCanvas />;
@@ -47,21 +47,12 @@ function GlobeCanvas() {
 
 
 
-  // Because getWidgetData for earthquakes doesn't return coords, do a direct USGS fetch on the client for the globe.
   const quakesFull = useQuery({
     queryKey: ["globe-quakes-geo"],
     queryFn: async () => {
-      const res = await fetch("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson");
-      const data = await res.json();
-      return (data.features ?? []).map((f: any) => ({
-        id: f.id,
-        mag: Number(f.properties?.mag ?? 0),
-        place: String(f.properties?.place ?? ""),
-        time: Number(f.properties?.time ?? 0),
-        lat: Number(f.geometry?.coordinates?.[1] ?? 0),
-        lon: Number(f.geometry?.coordinates?.[0] ?? 0),
-        url: String(f.properties?.url ?? ""),
-      })) as Quake[];
+      const result = await fetchData({ data: { type: "earthquakes", settings: { minMagnitude: 2.5 } } });
+      if (result.error) throw new Error(result.error);
+      return (((result.data as any)?.events ?? []) as Quake[]).filter((quake) => Number.isFinite(quake.lat) && Number.isFinite(quake.lon));
     },
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
@@ -82,9 +73,11 @@ function GlobeCanvas() {
         .showGraticules(false)
         .pointOfView({ lat: 20, lng: 0, altitude: 2.4 });
       globeRef.current = g;
-      const controls = g.controls();
-      controls.autoRotate = true;
-      controls.autoRotateSpeed = 0.4;
+      const controls = g.controls?.();
+      if (controls) {
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.4;
+      }
       setReady(true);
 
       ro = new ResizeObserver(() => {
@@ -105,7 +98,8 @@ function GlobeCanvas() {
 
   useEffect(() => {
     if (!ready || !globeRef.current) return;
-    globeRef.current.controls().autoRotate = autoRotate;
+    const controls = globeRef.current.controls?.();
+    if (controls) controls.autoRotate = autoRotate;
   }, [autoRotate, ready]);
 
   // Points layer: quakes + ISS + favourites
@@ -119,9 +113,9 @@ function GlobeCanvas() {
         points.push({
           lat: q.lat,
           lng: q.lon,
-          size: 0.15 + Math.max(0, q.mag) * 0.08,
-          color: q.mag >= 5 ? "#ef4444" : q.mag >= 3.5 ? "#f59e0b" : "#38bdf8",
-          label: `M${q.mag.toFixed(1)} · ${q.place}`,
+          size: 0.15 + Math.max(0, q.magnitude) * 0.08,
+          color: q.magnitude >= 5 ? "#ef4444" : q.magnitude >= 3.5 ? "#f59e0b" : "#38bdf8",
+          label: `M${q.magnitude.toFixed(1)} · ${q.place}`,
           kind: "quake",
           url: q.url,
         });
@@ -168,13 +162,14 @@ function GlobeCanvas() {
     <div className="relative">
       <div
         ref={containerRef}
-        className="h-[70vh] w-full overflow-hidden rounded-2xl border border-glass-border bg-black"
+        className="h-[70vh] min-h-[520px] w-full overflow-hidden rounded-lg border border-glass-border bg-globe"
       />
       {!ready && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       )}
+      {(iss.isError || quakesFull.isError) && <div className="glass absolute right-3 top-3 max-w-64 p-3 text-xs text-neon-amber">Some live layers are unavailable. The globe remains interactive and will retry automatically.</div>}
 
       <div className="glass absolute left-3 top-3 flex flex-col gap-1 p-3 text-xs">
         <Toggle checked={showIss} onChange={setShowIss} label="ISS" color="#a78bfa" />
