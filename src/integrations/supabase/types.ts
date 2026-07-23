@@ -14,16 +14,151 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      favourite_locations: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          lat: number
+          lon: number
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          lat: number
+          lon: number
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          lat?: number
+          lon?: number
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          home_label: string | null
+          home_lat: number | null
+          home_lon: number | null
+          id: string
+          timezone: string
+          units: Database["public"]["Enums"]["unit_system"]
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          home_label?: string | null
+          home_lat?: number | null
+          home_lon?: number | null
+          id: string
+          timezone?: string
+          units?: Database["public"]["Enums"]["unit_system"]
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          home_label?: string | null
+          home_lat?: number | null
+          home_lon?: number | null
+          id?: string
+          timezone?: string
+          units?: Database["public"]["Enums"]["unit_system"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      widget_configs: {
+        Row: {
+          created_at: string
+          h: number
+          id: string
+          settings: Json
+          updated_at: string
+          user_id: string
+          w: number
+          widget_type: string
+          x: number
+          y: number
+        }
+        Insert: {
+          created_at?: string
+          h?: number
+          id?: string
+          settings?: Json
+          updated_at?: string
+          user_id: string
+          w?: number
+          widget_type: string
+          x?: number
+          y?: number
+        }
+        Update: {
+          created_at?: string
+          h?: number
+          id?: string
+          settings?: Json
+          updated_at?: string
+          user_id?: string
+          w?: number
+          widget_type?: string
+          x?: number
+          y?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      unit_system: "metric" | "imperial"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +285,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      unit_system: ["metric", "imperial"],
+    },
   },
 } as const
