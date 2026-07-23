@@ -75,18 +75,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "OMNISPHERE — Your global awareness command center" },
+      { title: "OMNISPHERE — One dashboard. The entire planet." },
       {
         name: "description",
         content:
-          "OMNISPHERE is a real-time cockpit for weather, space, finance, news and Earth sensors — arranged on a 3D globe with voice-controlled AI.",
+          "Real-time weather, space, finance and news widgets on a 3D globe with voice-controlled AI. Your personal awareness cockpit.",
       },
       { name: "author", content: "OMNISPHERE" },
       { name: "theme-color", content: "#0b1224" },
-      { property: "og:title", content: "OMNISPHERE — Global Awareness Command Center" },
-      { property: "og:description", content: "One dashboard. The entire planet. Your voice in control." },
+      { property: "og:title", content: "OMNISPHERE — One dashboard. The entire planet." },
+      { property: "og:description", content: "Real-time weather, space, finance and news widgets on a 3D globe with voice-controlled AI. Your personal awareness cockpit." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "OMNISPHERE — One dashboard. The entire planet." },
+      { name: "twitter:description", content: "Real-time weather, space, finance and news widgets on a 3D globe with voice-controlled AI. Your personal awareness cockpit." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/83ede13c-1d08-458e-b3ae-3eef13907e29" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/83ede13c-1d08-458e-b3ae-3eef13907e29" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
           "Real-time weather, space, finance and news widgets on a 3D globe with voice-controlled AI. Your personal awareness cockpit.",
       },
       { property: "og:title", content: "OMNISPHERE — One dashboard. The entire planet." },
-      { property: "og:description", content: "Real-time weather, space, finance and news widgets on a live 3D globe. Voice-controlled." },
+      { property: "og:description", content: "Real-time weather, space, finance and news widgets on a 3D globe with voice-controlled AI. Your personal awareness cockpit." },
     ],
   }),
   component: Landing,
