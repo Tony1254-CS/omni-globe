@@ -73,9 +73,7 @@ export async function buildPulseSnapshot(home: { label: string; lat: number; lon
 }
 
 export async function synthesizePulse(snap: PulseSnapshot): Promise<Pulse> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("Missing LOVABLE_API_KEY");
-
+  const { callChat } = await import("./ai-chat.server");
   const system = `You are OMNISPHERE Pulse: a cinematic morning briefing engine. From the JSON snapshot, output ONE compact JSON object matching this schema exactly:
 {
   "headline": string (8-14 words, cinematic, present tense, no clickbait),
@@ -92,27 +90,13 @@ Rules:
 - Use the user's home location name in the headline when present.
 - Output ONLY valid JSON. No markdown, no prose, no code fences.`;
 
-  const user = JSON.stringify(snap);
-
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: "google/gemini-3.6-flash",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-    signal: AbortSignal.timeout(45000),
+  const content = await callChat({
+    system,
+    user: JSON.stringify(snap),
+    jsonMode: true,
+    model: "google/gemini-3.6-flash",
+    timeoutMs: 45000,
   });
-  if (res.status === 429) throw new Error("Rate limit — please try again in a moment.");
-  if (res.status === 402) throw new Error("AI credits exhausted. Add credits to your Lovable workspace.");
-  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-  const body = await res.json() as any;
-  const content = body?.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Empty response from AI");
   try {
     return JSON.parse(content) as Pulse;
   } catch {

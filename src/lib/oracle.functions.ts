@@ -54,8 +54,7 @@ export const askOracle = createServerFn({ method: "POST" })
     question: z.string().min(1).max(2000),
   }).parse(input))
   .handler(async ({ context, data }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const { callChat } = await import("./ai-chat.server");
 
     // Save user message
     await context.supabase.from("oracle_messages").insert({
@@ -73,22 +72,14 @@ export const askOracle = createServerFn({ method: "POST" })
     const system = `You are the OMNISPHERE Causal Oracle — a global-intelligence analyst that reasons about cause and effect across weather, geopolitics, markets, space, and science. Answer clearly with a short direct answer, then a "Because" section using bullet chains ("A → B → C"). Cite mechanisms, not sources. When useful, end with a "What if" alternative scenario. Keep replies under 350 words. Use Markdown.`;
 
     const messages = [
-      { role: "system", content: system },
-      ...(history ?? []).map((m) => ({ role: m.role, content: m.content })),
+      { role: "system" as const, content: system },
+      ...(history ?? []).map((m) => ({
+        role: (m.role === "assistant" ? "assistant" : m.role === "system" ? "system" : "user") as "system" | "user" | "assistant",
+        content: m.content,
+      })),
     ];
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: "google/gemini-3.6-flash", messages }),
-      signal: AbortSignal.timeout(60000),
-    });
-
-    if (res.status === 429) throw new Error("Rate limited — try again in a moment.");
-    if (res.status === 402) throw new Error("AI credits exhausted. Add credits to your Lovable workspace.");
-    if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-    const body = await res.json() as any;
-    const content = body?.choices?.[0]?.message?.content ?? "";
+    const content = await callChat({ messages, model: "google/gemini-3.6-flash" });
 
     const { data: saved, error } = await context.supabase.from("oracle_messages").insert({
       thread_id: data.threadId, user_id: context.userId, role: "assistant", content,

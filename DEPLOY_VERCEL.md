@@ -1,130 +1,79 @@
-# Deploying OMNISPHERE to Vercel
+# Deploying OMNISPHERE to Vercel (BYO keys)
 
-> **TL;DR** — This app was built for **Lovable Cloud**, which auto-injects
-> every secret. Vercel does not have those bindings. You *can* deploy the
-> frontend + server functions to Vercel, but a few features will not work
-> until you migrate the backend (see "What breaks on Vercel" below).
->
-> **Recommended path is still**: click **Publish** in Lovable →
-> `https://omni-globe.lovable.app`. Everything works with zero config.
+You control the whole stack: your own Supabase project + your own Google Gemini API key.
 
 ---
 
-## 1. Change the build target to Vercel
+## 1. Create your Supabase project
 
-The project currently builds for **Cloudflare Workers** (default in
-`@lovable.dev/vite-tanstack-config` → nitro preset). Vercel needs a different
-preset.
+1. Go to https://supabase.com/dashboard → **New Project**.
+2. Wait for it to provision, then open **Project Settings → API** and copy:
+   - `Project URL`
+   - `anon` (publishable) key
+   - `service_role` (secret) key
+3. Open **SQL Editor → New query**, paste the entire contents of
+   `supabase/all_migrations.sql` from this repo, and click **Run**.
+   That creates every table, RLS policy, and function OMNISPHERE needs.
+4. **Auth → Providers → Email**: turn **Confirm email** OFF (for trial demos).
+5. (Optional) **Auth → URL Configuration**: add your Vercel production URL
+   to `Site URL` and `Redirect URLs`.
 
-Edit `vite.config.ts`:
+## 2. Get a Google Gemini API key
 
-```ts
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+1. Go to https://aistudio.google.com/apikey
+2. **Create API key** → copy the value (starts with `AIza...`).
+3. Free tier is enough for demos.
 
-export default defineConfig({
-  tanstackStart: {
-    server: { entry: "server" },
-  },
-  // Tell nitro to build for Vercel instead of Cloudflare
-  nitro: {
-    preset: "vercel",
-  },
-});
-```
+## 3. Push this repo to GitHub
 
-No `vercel.json` is needed — the nitro Vercel preset outputs the correct
-`.vercel/output/` structure automatically.
+Standard `git init && git remote add origin ... && git push`.
 
-## 2. Set environment variables in Vercel
+## 4. Import into Vercel
 
-**Project → Settings → Environment Variables** (Production + Preview + Development).
+1. https://vercel.com/new → import the repo.
+2. Framework preset: **Other** (Vercel will auto-detect Vite/Nitro).
+3. Build command: `npm run build` (default).
+4. Output directory: leave blank.
+5. **Environment Variables** — add ALL of these:
 
-### Required — client (build time)
-| Name | Value |
-|---|---|
-| `VITE_SUPABASE_URL` | Same as `SUPABASE_URL` below |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_QqAAxDaiu8IFJT36LOFd5Q_nf5Md6gA` |
-| `VITE_SUPABASE_PROJECT_ID` | `chtupravnalojbapolbl` |
+   | Name | Value | Notes |
+   |------|-------|-------|
+   | `DEPLOY_TARGET` | `vercel` | Switches Nitro to Vercel preset |
+   | `VITE_SUPABASE_URL` | your Project URL | Browser-visible |
+   | `VITE_SUPABASE_PUBLISHABLE_KEY` | your anon key | Browser-visible |
+   | `SUPABASE_URL` | your Project URL | Server-side |
+   | `SUPABASE_PUBLISHABLE_KEY` | your anon key | Server-side |
+   | `SUPABASE_SERVICE_ROLE_KEY` | your service_role key | **Server-only, keep secret** |
+   | `GEMINI_API_KEY` | your Google Gemini key | Powers Oracle, Pulse, Foresight, Agents |
 
-### Required — server (runtime)
-| Name | Where to get it |
-|---|---|
-| `SUPABASE_URL` | `https://chtupravnalojbapolbl.supabase.co` |
-| `SUPABASE_PUBLISHABLE_KEY` | Same as `VITE_SUPABASE_PUBLISHABLE_KEY` |
-| `SUPABASE_SERVICE_ROLE_KEY` | **⚠ Not available on Lovable Cloud** — see below |
-| `LOVABLE_API_KEY` | **⚠ Managed by Lovable** — cannot be exported |
+6. **Deploy**.
 
-### Optional — feature secrets
-Only add if you configured them:
-- `IOT_INGEST_SECRET` (HMAC for `/api/public/iot/ingest`)
-- `REFRESH_WIDGETS_SECRET` (HMAC for the cache warmer)
-- Any custom API keys you added via Lovable's secrets UI
+## 5. Test it
 
-## 3. Deploy
+- Sign up with any email → should log in immediately (no verification).
+- Add a location in Settings.
+- Open Dashboard → widgets should populate within ~30s.
+- Try Oracle → asks Gemini directly with your key.
+- Try Pulse → generates cinematic briefing.
 
-```
-vercel --prod
-```
+## What changed to make this work
 
-Or connect the GitHub repo in the Vercel dashboard and push.
+- `vite.config.ts` now switches to Vercel's Nitro preset when `DEPLOY_TARGET=vercel`.
+- All AI calls (`briefing.server.ts`, `pulse.server.ts`, `oracle.functions.ts`,
+  `foresight.server.ts`, `timemachine.server.ts`, `agents.server.ts`) go through
+  `src/lib/ai-chat.server.ts`, which prefers `GEMINI_API_KEY` when set and
+  falls back to `LOVABLE_API_KEY` otherwise.
+- Model IDs are auto-mapped: `google/gemini-3.6-flash` → `gemini-2.0-flash`
+  on the direct Gemini API.
 
----
+## Troubleshooting
 
-## What breaks on Vercel (and why)
+**"Missing Supabase environment variable(s)"** → you skipped one of the Vercel env vars. Add them, then in Vercel dashboard: **Deployments → ⋯ → Redeploy**.
 
-### ❌ AI features (Oracle, Pulse, Foresight briefings, Causal reasoning)
-These use **Lovable AI Gateway**, authenticated by `LOVABLE_API_KEY`.
-That key is minted per-project by Lovable and **cannot be copied out**.
+**AI features fail with 401** → your `GEMINI_API_KEY` is wrong or restricted. Regenerate in AI Studio.
 
-**Fix**: replace `src/lib/ai-gateway.server.ts` with your own OpenAI or
-Google Gemini key. Add `OPENAI_API_KEY` (or `GOOGLE_GENERATIVE_AI_API_KEY`)
-to Vercel and swap the provider. This is a code change I can do if you want.
+**Widgets say "warming up" forever** → the cache warmer cron isn't running. Either:
+- Hit `https://your-app.vercel.app/api/public/hooks/refresh-widgets` manually, OR
+- Add a Vercel Cron in `vercel.json` (5-min interval) hitting that same URL.
 
-### ❌ Server-side cache writes (`provider_cache` table, widget warmer)
-The cache uses `supabaseAdmin` (service role) to bypass RLS when writing
-provider responses. Lovable Cloud **does not expose the service role key**.
-
-**Fix**: either
-1. Migrate to your own self-hosted Supabase project (you'll get full key
-   access), OR
-2. Rewrite the cache layer to use only the publishable key + RLS policies
-   scoped to `authenticated` — this reduces cache hit rate and increases
-   external API calls (429s will come back).
-
-### ❌ IoT device ingest (`/api/public/iot/ingest`)
-Same reason — writes to `iot_readings` under service role.
-
-### ❌ pg_cron widget refresh
-The scheduled function inside your database calls
-`https://…lovable.app/api/public/hooks/refresh-widgets`. You'd need to
-update the cron target URL to your Vercel domain.
-
-### ✅ What still works on Vercel
-- Auth (signup / login / session) — uses publishable key only
-- Reading widgets from cache (if cache has been populated by the Lovable
-  deployment)
-- Globe, Time Machine, History charts, dashboards, layouts
-- Share links, achievements, automations UI, agents UI (list/edit only —
-  execution needs AI key)
-
----
-
-## Honest recommendation
-
-If you're demoing this project (portfolio, hackathon, class project),
-publish through **Lovable** — every feature works, no config, and the URL
-is `https://omni-globe.lovable.app`.
-
-Move to Vercel only if you have a business reason to leave Lovable
-hosting *and* you're prepared to also:
-1. Migrate the database to your own Supabase project (to get service role
-   access), and
-2. Bring your own AI provider key.
-
-Want me to do any of these? I can:
-- **[A]** Add the Vercel nitro preset config (change #1 above) so you can
-  deploy the frontend today, accepting the broken features.
-- **[B]** Swap Lovable AI → your own OpenAI/Gemini key end-to-end.
-- **[C]** Refactor the cache layer to not require service-role.
-
-Tell me which and I'll do it.
+**Reset Supabase** → re-run `supabase/all_migrations.sql`. All statements are idempotent-friendly enough for a fresh project.

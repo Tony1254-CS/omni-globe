@@ -150,8 +150,7 @@ export async function narrateDay(input: {
   homeLabel?: string | null;
   snapshot: DaySnapshot;
 }): Promise<string> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("Missing LOVABLE_API_KEY");
+  const { callChat } = await import("./ai-chat.server");
 
   const topQuake = input.snapshot.quakes[0];
   const facts = {
@@ -165,26 +164,8 @@ export async function narrateDay(input: {
   };
 
   const system = `You are OMNISPHERE's Time Machine narrator. Write a short, cinematic 2–4 sentence paragraph about what the world was doing on a specific date, tying it to the user's personal milestone. Warm, vivid, factual — never invent events not present in the facts. If no earthquake or headline is provided, focus on the date and setting instead. No emojis. No headings.`;
-
   const user = `Facts (JSON):\n${JSON.stringify(facts)}\n\nWrite the narration now.`;
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: "google/gemini-3.6-flash",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
-  if (res.status === 429) throw new Error("Rate limit — try again in a moment.");
-  if (res.status === 402) throw new Error("AI credits exhausted.");
-  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-  const body = await res.json() as any;
-  const content = body?.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Empty AI response");
+  const content = await callChat({ system, user, model: "google/gemini-3.6-flash", timeoutMs: 30000 });
   return String(content).trim();
 }

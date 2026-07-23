@@ -69,31 +69,8 @@ export async function buildSnapshot(input: {
 }
 
 export async function generateBriefingMarkdown(snapshot: BriefingSnapshot): Promise<string> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("Missing LOVABLE_API_KEY");
-
+  const { callChat } = await import("./ai-chat.server");
   const system = `You are the OMNISPHERE analyst. Produce a concise, two-page executive briefing in Markdown covering: (1) Weather & environmental risks for the user's watched locations, (2) Space & science milestones, (3) Financial & markets shifts, (4) Notable world events from the headlines, (5) Recommended attention items based on flagged anomalies. Use ## section headings, short paragraphs, bullet lists. Do not invent facts beyond the snapshot provided. Keep it under 700 words.`;
-
   const user = `Snapshot (JSON):\n\`\`\`json\n${JSON.stringify(snapshot, null, 2)}\n\`\`\`\n\nWrite the briefing now.`;
-
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: "google/gemini-3.6-flash",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-    signal: AbortSignal.timeout(60000),
-  });
-
-  if (res.status === 429) throw new Error("Rate limit — please try again in a moment.");
-  if (res.status === 402) throw new Error("AI credits exhausted. Add credits to your Lovable workspace.");
-  if (!res.ok) throw new Error(`AI gateway error ${res.status}`);
-  const body = await res.json() as any;
-  const content = body?.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Empty response from AI");
-  return content;
+  return callChat({ system, user, model: "google/gemini-3.6-flash" });
 }
