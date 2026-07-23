@@ -27,6 +27,7 @@ import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedAgentsRouteImport } from './routes/_authenticated/agents'
 import { Route as AuthenticatedAchievementsRouteImport } from './routes/_authenticated/achievements'
 import { Route as ApiPublicHooksRunAutomationsRouteImport } from './routes/api/public/hooks/run-automations'
+import { Route as ApiPublicHooksRefreshWidgetsRouteImport } from './routes/api/public/hooks/refresh-widgets'
 import { Route as ApiPublicHooksDeviceIngestRouteImport } from './routes/api/public/hooks/device-ingest'
 
 const AuthRoute = AuthRouteImport.update({
@@ -121,6 +122,12 @@ const ApiPublicHooksRunAutomationsRoute =
     path: '/api/public/hooks/run-automations',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksRefreshWidgetsRoute =
+  ApiPublicHooksRefreshWidgetsRouteImport.update({
+    id: '/api/public/hooks/refresh-widgets',
+    path: '/api/public/hooks/refresh-widgets',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksDeviceIngestRoute =
   ApiPublicHooksDeviceIngestRouteImport.update({
     id: '/api/public/hooks/device-ingest',
@@ -146,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/shares': typeof AuthenticatedSharesRoute
   '/s/$slug': typeof SSlugRoute
   '/api/public/hooks/device-ingest': typeof ApiPublicHooksDeviceIngestRoute
+  '/api/public/hooks/refresh-widgets': typeof ApiPublicHooksRefreshWidgetsRoute
   '/api/public/hooks/run-automations': typeof ApiPublicHooksRunAutomationsRoute
 }
 export interface FileRoutesByTo {
@@ -166,6 +174,7 @@ export interface FileRoutesByTo {
   '/shares': typeof AuthenticatedSharesRoute
   '/s/$slug': typeof SSlugRoute
   '/api/public/hooks/device-ingest': typeof ApiPublicHooksDeviceIngestRoute
+  '/api/public/hooks/refresh-widgets': typeof ApiPublicHooksRefreshWidgetsRoute
   '/api/public/hooks/run-automations': typeof ApiPublicHooksRunAutomationsRoute
 }
 export interface FileRoutesById {
@@ -188,6 +197,7 @@ export interface FileRoutesById {
   '/_authenticated/shares': typeof AuthenticatedSharesRoute
   '/s/$slug': typeof SSlugRoute
   '/api/public/hooks/device-ingest': typeof ApiPublicHooksDeviceIngestRoute
+  '/api/public/hooks/refresh-widgets': typeof ApiPublicHooksRefreshWidgetsRoute
   '/api/public/hooks/run-automations': typeof ApiPublicHooksRunAutomationsRoute
 }
 export interface FileRouteTypes {
@@ -210,6 +220,7 @@ export interface FileRouteTypes {
     | '/shares'
     | '/s/$slug'
     | '/api/public/hooks/device-ingest'
+    | '/api/public/hooks/refresh-widgets'
     | '/api/public/hooks/run-automations'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -230,6 +241,7 @@ export interface FileRouteTypes {
     | '/shares'
     | '/s/$slug'
     | '/api/public/hooks/device-ingest'
+    | '/api/public/hooks/refresh-widgets'
     | '/api/public/hooks/run-automations'
   id:
     | '__root__'
@@ -251,6 +263,7 @@ export interface FileRouteTypes {
     | '/_authenticated/shares'
     | '/s/$slug'
     | '/api/public/hooks/device-ingest'
+    | '/api/public/hooks/refresh-widgets'
     | '/api/public/hooks/run-automations'
   fileRoutesById: FileRoutesById
 }
@@ -260,6 +273,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   SSlugRoute: typeof SSlugRoute
   ApiPublicHooksDeviceIngestRoute: typeof ApiPublicHooksDeviceIngestRoute
+  ApiPublicHooksRefreshWidgetsRoute: typeof ApiPublicHooksRefreshWidgetsRoute
   ApiPublicHooksRunAutomationsRoute: typeof ApiPublicHooksRunAutomationsRoute
 }
 
@@ -391,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksRunAutomationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/refresh-widgets': {
+      id: '/api/public/hooks/refresh-widgets'
+      path: '/api/public/hooks/refresh-widgets'
+      fullPath: '/api/public/hooks/refresh-widgets'
+      preLoaderRoute: typeof ApiPublicHooksRefreshWidgetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/device-ingest': {
       id: '/api/public/hooks/device-ingest'
       path: '/api/public/hooks/device-ingest'
@@ -442,6 +463,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   SSlugRoute: SSlugRoute,
   ApiPublicHooksDeviceIngestRoute: ApiPublicHooksDeviceIngestRoute,
+  ApiPublicHooksRefreshWidgetsRoute: ApiPublicHooksRefreshWidgetsRoute,
   ApiPublicHooksRunAutomationsRoute: ApiPublicHooksRunAutomationsRoute,
 }
 export const routeTree = rootRouteImport
