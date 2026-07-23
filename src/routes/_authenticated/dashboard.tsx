@@ -132,14 +132,15 @@ function Dashboard() {
           {widgets.map((w) => {
             const meta = WIDGET_CATALOG.find((c) => c.type === w.widget_type);
             return (
-              <WidgetShell
-                key={w.id}
-                title={meta?.label ?? w.widget_type}
-                onRemove={() => delMut.mutate(w.id)}
-                removeIcon={<Trash2 className="h-3.5 w-3.5" />}
-              >
-                <LiveWidget id={w.id} type={w.widget_type} settings={w.settings} />
-              </WidgetShell>
+              <div key={w.id} data-grid={{ i: w.id, x: w.x, y: w.y, w: w.w, h: w.h }}>
+                <WidgetShell
+                  title={meta?.label ?? w.widget_type}
+                  onRemove={() => delMut.mutate(w.id)}
+                  removeIcon={<Trash2 className="h-3.5 w-3.5" />}
+                >
+                  <LiveWidget id={w.id} type={w.widget_type} settings={w.settings} />
+                </WidgetShell>
+              </div>
             );
           })}
         </LayoutGrid>
