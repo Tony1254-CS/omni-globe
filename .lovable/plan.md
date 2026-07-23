@@ -1,39 +1,66 @@
-# Why nothing works on Vercel
+# Full Vercel Setup Plan
 
-Your app runs on **Lovable Cloud**, which auto-injects backend credentials (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `LOVABLE_API_KEY`, plus the `VITE_*` versions) into the runtime. Vercel doesn't know about Lovable Cloud, so those variables are empty — every server function (widgets, globe data, AI, auth session checks) crashes with the "Missing Supabase environment variable(s)" error you see in the toast.
+You provide the keys, I wire everything up. Here's exactly what happens.
 
-Nothing is actually broken in the code. It's a missing-config problem on Vercel.
+## What I need from you (in this order)
 
-## Two paths forward
+1. **Google Gemini API key** — from https://aistudio.google.com/apikey (starts with `AIza...`)
+2. **A new Supabase project** — create at https://supabase.com/dashboard → New Project. Then from **Project Settings → API**, send me:
+   - Project URL (`https://xxxxx.supabase.co`)
+   - `anon` / publishable key
+   - `service_role` key (secret — treat carefully)
 
-### Option A — Just publish through Lovable (recommended, zero config)
-You already have a working published URL: `https://omni-globe.lovable.app`. Publishing from Lovable wires every secret automatically, including the AI gateway. No Vercel setup, no key copying. This is what the project was built for.
+## What I'll do (once you send the keys)
 
-### Option B — Keep Vercel, add the env vars manually
-In Vercel → Project → Settings → Environment Variables, add these for **Production, Preview, and Development**:
+### Step 1 — Prepare your Supabase project
+- Give you the exact SQL to paste into your Supabase SQL Editor (it's already bundled at `supabase/all_migrations.sql`). One paste, one Run.
+- Confirm auth settings: email confirmation OFF, email/password enabled.
+- (Optional) Add your Vercel URL to Site URL / Redirect URLs later.
 
-Client-visible (needed at build time):
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
-- `VITE_SUPABASE_PROJECT_ID`
+### Step 2 — Wire the keys into Vercel
+Guide you through Vercel's Environment Variables screen with these 7 values:
 
-Server-only (needed by server functions):
-- `SUPABASE_URL` (same value as `VITE_SUPABASE_URL`)
-- `SUPABASE_PUBLISHABLE_KEY` (same value as `VITE_SUPABASE_PUBLISHABLE_KEY`)
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `LOVABLE_API_KEY` (for Gemini briefings / Oracle / Pulse)
-- Any HMAC/webhook secrets you've added (IoT ingest, refresh-widgets hook, etc.)
+```text
+DEPLOY_TARGET                   = vercel
+VITE_SUPABASE_URL               = <your project URL>
+VITE_SUPABASE_PUBLISHABLE_KEY   = <anon key>
+SUPABASE_URL                    = <your project URL>
+SUPABASE_PUBLISHABLE_KEY        = <anon key>
+SUPABASE_SERVICE_ROLE_KEY       = <service_role key>
+GEMINI_API_KEY                  = <your Gemini key>
+```
 
-Then redeploy. Two Lovable-Cloud caveats:
-1. **`SUPABASE_SERVICE_ROLE_KEY` is not exposed to you on Lovable Cloud** — you cannot copy it out. That means several features (server-side `provider_cache` writes, IoT ingest, admin ops, cron refresh) will not work on Vercel until you either move to a self-managed Supabase project or accept those features being broken. This is a hard limit, not something I can code around.
-2. **`LOVABLE_API_KEY`** is Lovable-managed. Outside Lovable hosting, AI features (Oracle, Pulse briefings, Foresight narration) will fail unless you swap them to a direct provider key (e.g. your own Gemini/OpenAI key).
+### Step 3 — Push to GitHub & import to Vercel
+- You push the repo (or connect via Vercel's GitHub integration).
+- Framework preset: Other. Build command and output stay default.
+- Click Deploy.
 
-## My recommendation
+### Step 4 — Post-deploy verification
+Together we'll test:
+- Sign up → instant login (no email verification).
+- Add a location in Settings.
+- Dashboard widgets populate.
+- Oracle answers a question (proves Gemini works).
+- Pulse generates a briefing.
 
-Publish through Lovable. Everything you built — widgets, globe, AI, IoT, cache warmer, share links — depends on Lovable Cloud bindings that Vercel physically cannot receive. Vercel would only host a degraded version of the app.
+### Step 5 — Set up the widget cache warmer (optional but recommended)
+Add a `vercel.json` cron hitting `/api/public/hooks/refresh-widgets` every 5 minutes so widgets stay fresh without user traffic.
 
-## What I'd like to confirm before doing anything
+## What's already done in the code (from the previous turn)
 
-Tell me which path you want:
-- **A**: I'll do nothing to the code; just click "Publish" in Lovable and use `omni-globe.lovable.app` (or attach your custom domain).
-- **B**: You want to stay on Vercel knowing the service-role + AI features will be broken — I'll add a Vercel deploy guide (`DEPLOY_VERCEL.md`) and a `vercel.json` if needed.
+- All 6 AI callsites now route through `src/lib/ai-chat.server.ts` — auto-uses `GEMINI_API_KEY` when present.
+- `vite.config.ts` switches to Vercel's Nitro preset when `DEPLOY_TARGET=vercel`.
+- Migrations bundled at `supabase/all_migrations.sql`.
+- Full walkthrough written to `DEPLOY_VERCEL.md`.
+
+## What I need you to do first
+
+Reply with:
+1. Your Gemini API key
+2. Your Supabase Project URL
+3. Your Supabase anon key
+4. Your Supabase service_role key
+
+⚠️ **Security note**: pasting the service_role key in chat means it's in your chat history. After deploy works, rotate it in Supabase (Settings → API → Reset service_role key) and update the Vercel env var. Alternative: you paste it directly into Vercel yourself and just tell me "done" — I don't actually need to see it.
+
+Once you send them (or confirm you've set them in Vercel yourself), I'll drive the rest.
