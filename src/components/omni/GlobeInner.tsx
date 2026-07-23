@@ -44,12 +44,8 @@ function GlobeCanvas() {
     return { latitude: Number(p.latitude), longitude: Number(p.longitude), altitude: Number(p.altitude ?? 400), velocity: Number(p.velocity ?? 0) };
   }, [iss.data]);
 
-  const quakePoints = useMemo<Quake[]>(() => {
-    const raw = (quakes.data?.data as any)?.events ?? [];
-    // events lack coords; fall back to fetching geojson features via widget-data — but we already only expose limited fields.
-    // Use magnitude/place; place has no coords. Use USGS "place" heuristic isn't reliable — instead skip if no lat/lon.
-    return raw.filter((e: any) => e && typeof e === "object");
-  }, [quakes.data]);
+
+
 
   // Because getWidgetData for earthquakes doesn't return coords, do a direct USGS fetch on the client for the globe.
   const quakesFull = useQuery({
