@@ -68,7 +68,7 @@ export const runAgent = createServerFn({ method: "POST" })
         user_id: context.userId,
         input: data.input,
         output: result.output,
-        steps: result.steps,
+        steps: result.steps as never,
         status: result.status,
       })
       .select()
