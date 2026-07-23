@@ -42,18 +42,23 @@ export async function forecastWeather(lat: number, lon: number): Promise<Forecas
 }
 
 export async function forecastAqi(lat: number, lon: number): Promise<Forecast> {
-  const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=us_aqi&forecast_days=2&timezone=auto`);
-  const hourly: number[] = data?.hourly?.us_aqi ?? [];
+  const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=us_aqi,european_aqi&forecast_days=2&timezone=auto`);
+  const usHourly: Array<number | null> = data?.hourly?.us_aqi ?? [];
+  const euHourly: Array<number | null> = data?.hourly?.european_aqi ?? [];
+  const pick = (arr: Array<number | null>) => arr.map((v) => Number(v)).filter((v) => Number.isFinite(v));
+  const usValid = pick(usHourly);
+  const hourly = usValid.length ? usValid : pick(euHourly);
+  const scale = usValid.length ? "US" : "EU";
   if (!hourly.length) throw new Error("No AQI forecast");
   const tomorrow = hourly.slice(24, 48);
-  const peak = Math.max(...tomorrow);
+  const peak = Math.max(...(tomorrow.length ? tomorrow : hourly));
   const band = peak >= 150 ? "Unhealthy" : peak >= 100 ? "Unhealthy for sensitive groups" : peak >= 50 ? "Moderate" : "Good";
   const advisory = peak >= 100 ? "Limit outdoor exertion." : "No special precautions.";
   return {
-    headline: `Peak AQI tomorrow ≈ ${Math.round(peak)} (${band})`,
+    headline: `Peak ${scale} AQI tomorrow ≈ ${Math.round(peak)} (${band})`,
     detail: advisory,
     confidence: 0.75,
-    method: "Open-Meteo hourly forecast, max over 24h",
+    method: `Open-Meteo hourly ${scale}-AQI forecast, max over 24h`,
     source: "Open-Meteo Air Quality",
   };
 }
