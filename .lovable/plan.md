@@ -1,63 +1,40 @@
-## Goal
-Make all 17 catalog widgets genuinely useful. No widget will be presented as available unless it loads real data or clearly explains a missing integration.
+## Problem
 
-## Confirmed problem
-The dashboard currently routes every widget type to the same `PlaceholderWidget`, so the catalog advertises capabilities that are not implemented. The widget configuration CRUD exists, but the actual widget content layer does not.
+`/globe`, `/alerts`, and `/history` are still placeholder "coming in Phase X" screens — they render a single icon + text with no functionality. That's why they appear broken.
 
-## Implementation plan
+## Plan: make all three pages functional
 
-1. **Stabilize the dashboard lifecycle**
-   - Validate add, list, delete, drag, resize, and automatic layout persistence.
-   - Replace fire-and-forget layout saves with a debounced mutation that reports failures and avoids overlapping writes.
-   - Add per-widget loading, refresh, stale-data, empty, and retry states so one failed provider never breaks the dashboard.
-   - Ensure new widgets are positioned safely without magic coordinates or validation failures.
+### 1. Globe (`/globe`) — interactive 3D globe
+- Add `globe.gl` + `three` as deps.
+- New `src/components/omni/GlobeView.tsx`, browser-only via `React.lazy` behind `<ClientOnly>` (Leaflet/globe.gl rule).
+- Data layers driven by the existing `getWidgetData` server fn:
+  - ISS position (auto-refresh every 5s) — moving marker + orbit ring.
+  - Earthquakes (last 24h, USGS) — pulsing points sized by magnitude.
+  - Favourite locations from `favourite_locations` table — labeled pins.
+- Controls: toggle each layer, auto-rotate on/off, click a point to see a detail popover (place, magnitude, time, link).
+- Full-viewport dark canvas with neon glow matching the design system.
 
-2. **Build a shared live-data architecture**
-   - Add typed server functions and provider adapters; private credentials remain server-side.
-   - Add a backend cache for provider payloads, fetch timestamps, expiry, and error status to control rate limits and keep widgets useful during upstream outages.
-   - Use scheduled refreshes only where needed; allow safe on-demand refreshes with throttling.
-   - Normalize provider errors into user-friendly widget states rather than blank screens or raw exceptions.
+### 2. Alerts (`/alerts`) — threshold alerts
+- New table `public.alerts` (id, user_id, kind, params jsonb, threshold, comparator, enabled, last_triggered_at, created_at) with RLS `auth.uid() = user_id` and standard grants.
+- Server fns in `src/lib/alerts.functions.ts`: `listAlerts`, `createAlert`, `updateAlert`, `deleteAlert`, `evaluateAlerts` (pulls latest values via existing widget-data fetchers, compares, updates `last_triggered_at`, returns fired alerts).
+- UI: list of alerts with enable toggle, add-alert dialog with kind picker (Crypto price, Earthquake magnitude, Weather temp, AQI), comparator (`>`, `<`), threshold input, and per-kind params (coin, coordinates, min magnitude).
+- Client polls `evaluateAlerts` every 60s while page open; fired alerts show a sonner toast + inline "triggered" badge.
 
-3. **Implement the keyless widgets**
-   - Earthquakes: USGS feed, magnitude/time filters, latest-event list.
-   - ISS Tracker: current coordinates, velocity/altitude where available, last update.
-   - SpaceX: next launch, countdown, mission and launch status.
-   - World Clocks: configurable time zones with live clocks.
-   - Reddit: configurable subreddit and hot-post list using a viable public feed/fallback.
-   - Crypto Ticker: selected assets, prices, 24-hour movement, compact trend display.
-   - Currency: base/quote selection, conversion, current rate.
-   - Country Explorer: search/random country, flag, capital, population, region, map link.
-   - GitHub Trending: trending/popular repositories with language and stars using the best available public source or connected GitHub access.
-   - Quote of the Day: daily cached quote with attribution.
-   - COVID Stats: global/country statistics with source timestamp and graceful handling if the upstream dataset is retired.
+### 3. History (`/history`) — historical charts
+- No new tables; use free historical APIs already keyless:
+  - Weather: Open-Meteo `archive-api` (`/v1/archive`) for temperature by lat/lon + date range.
+  - Crypto: CoinGecko `/coins/{id}/market_chart` for price history.
+  - Earthquakes: USGS `query` endpoint filtered by date + min magnitude, shown as a time-bucketed bar chart.
+- Extend `widget-data.server.ts` with a `fetchHistory(kind, params)` helper and expose `getHistoryData` server fn (auth-gated, same pattern as `getWidgetData`).
+- UI: dataset picker + parameter inputs + date-range slider (default last 30 days). Charts via `recharts` (already common in this stack; add if missing). URL search params (`?kind=&from=&to=&...`) drive state so views are shareable.
 
-4. **Implement credential-backed widgets**
-   - Weather: location search, current conditions, forecast, unit preference.
-   - Air Quality: AQI category, pollutants, health guidance, selected location.
-   - News: top headlines, country/category/keyword filtering, source links.
-   - Astronomy Picture of the Day: media, title, date, explanation, source link.
-   - Mars Rover: rover/camera/date controls and real photo results.
-   - Near-Earth Objects: upcoming approaches, size, distance, velocity, hazard status.
-   - First check existing project connections and securely stored credentials; only request provider credentials that are actually missing, using the secure secret flow.
+### 4. SEO / metadata
+- Give each route a route-specific `head()` title + description + og:title/og:description (already partly there; extend to include og:type + twitter:card and unique copy).
 
-5. **Add widget settings and real rendering**
-   - Replace `PlaceholderWidget` dispatch with a typed widget registry mapping every catalog type to its real component.
-   - Add a settings action to each widget for location, symbols, currencies, time zones, country, subreddit, filters, and refresh preferences as applicable.
-   - Persist settings in each widget’s existing configuration record and validate them server-side.
-   - Show data source and “updated at” information without exposing implementation details.
+## Technical notes
+- All data fetches go through authenticated `createServerFn` + `requireSupabaseAuth` (matches existing pattern).
+- Errors return `{ error }` shape like `getWidgetData` so pages never blank.
+- Loaders on `_authenticated/*` routes are safe (route gate handles auth); use `ensureQueryData` + `useSuspenseQuery`.
+- Add `errorComponent` + `notFoundComponent` to each new route.
 
-6. **Make availability honest**
-   - During implementation, mark unfinished or credential-blocked widgets as unavailable instead of allowing users to add fake widgets.
-   - Once complete, every enabled catalog item must have a real renderer, real data path, useful empty state, and retry behavior.
-
-7. **Verify end-to-end**
-   - Test all 17 widgets independently and together on the dashboard.
-   - Verify add/remove/settings persistence, refresh, drag/resize persistence, hard reload, provider failure, expired cache, and signed-out behavior.
-   - Check desktop and the current narrow viewport for clipping, overlapping controls, and unreadable widget content.
-   - Confirm route metadata remains complete and run the relevant security/database checks after backend changes.
-
-## Technical boundaries
-- App-internal data access will use authenticated TanStack server functions.
-- Scheduled external refreshes will use secured public server routes plus backend scheduling, not browser polling.
-- User-owned settings remain protected by row-level access rules; shared cached provider data exposes only safe public payloads.
-- API keys will never be stored in frontend code or widget settings.
+Ready to build once you approve. Want all three in one pass, or should I ship them one route at a time (Globe first)?
