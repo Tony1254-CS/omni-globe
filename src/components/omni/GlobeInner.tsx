@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2 } from "lucide-react";
@@ -6,31 +6,12 @@ import { Loader2 } from "lucide-react";
 import { getWidgetData } from "@/lib/widget-data.functions";
 import { listFavourites } from "@/lib/favourites.functions";
 
-// globe.gl imports three internally and touches window; must be client-only.
-const Globe = lazy(() => import("react-globe-lazy").catch(() => import("./GlobeInner")));
-
-export function GlobeView() {
-  return (
-    <Suspense fallback={<GlobeFallback />}>
-      <GlobeInner />
-    </Suspense>
-  );
-}
-
-function GlobeFallback() {
-  return (
-    <div className="grid h-[70vh] place-items-center rounded-2xl border border-glass-border bg-black/50">
-      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-    </div>
-  );
-}
-
-function GlobeInner() {
-  return <GlobeCanvas />;
-}
-
 type IssPos = { latitude: number; longitude: number; altitude: number; velocity: number };
 type Quake = { id: string; mag: number; place: string; time: number; lat: number; lon: number; url: string };
+
+export default function GlobeInner() {
+  return <GlobeCanvas />;
+}
 
 function GlobeCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
