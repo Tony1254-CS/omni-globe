@@ -13,6 +13,7 @@ export type WidgetDataResult = {
   source: string;
   updatedAt: string;
   data: WidgetDataValue;
+  error?: string;
 };
 
 export const DEFAULT_WIDGET_SETTINGS: Record<string, WidgetSettings> = {
