@@ -1,18 +1,22 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ClientOnly } from "@tanstack/react-router";
-import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
+import RGL, {
+  WidthProvider,
+  type Layout,
+  type LayoutItem,
+} from "react-grid-layout/legacy";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
-const ResponsiveGrid = WidthProvider(GridLayout);
+const ResponsiveGrid = WidthProvider(RGL);
 
 export function LayoutGrid({
   items,
   onLayoutChange,
   children,
 }: {
-  items: Layout[];
-  onLayoutChange: (next: Layout[]) => void;
+  items: LayoutItem[];
+  onLayoutChange: (next: LayoutItem[]) => void;
   children: ReactNode;
 }) {
   return (
@@ -29,12 +33,11 @@ function ClientGrid({
   onLayoutChange,
   children,
 }: {
-  items: Layout[];
-  onLayoutChange: (next: Layout[]) => void;
+  items: LayoutItem[];
+  onLayoutChange: (next: LayoutItem[]) => void;
   children: ReactNode;
 }) {
-  // Debounce persistence so a drag doesn't hammer the DB.
-  const [pending, setPending] = useState<Layout[] | null>(null);
+  const [pending, setPending] = useState<Layout | null>(null);
   useEffect(() => {
     if (!pending) return;
     const t = setTimeout(() => {
@@ -52,7 +55,7 @@ function ClientGrid({
       rowHeight={60}
       margin={[16, 16]}
       draggableHandle=".widget-handle"
-      onLayoutChange={(next) => setPending(next)}
+      onLayoutChange={(next: Layout) => setPending(next)}
       compactType="vertical"
     >
       {children}

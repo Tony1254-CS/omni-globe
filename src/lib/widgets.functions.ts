@@ -13,13 +13,18 @@ export const listWidgets = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+type JsonValue = string | number | boolean | null | { [k: string]: JsonValue } | JsonValue[];
+const jsonSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonSchema), z.record(z.string(), jsonSchema)]),
+);
+
 const NewWidget = z.object({
   widget_type: z.string().min(1).max(60),
   x: z.number().int().min(0).max(48).default(0),
   y: z.number().int().min(0).max(200).default(0),
   w: z.number().int().min(1).max(24).default(4),
   h: z.number().int().min(1).max(24).default(4),
-  settings: z.record(z.string(), z.unknown()).default({}),
+  settings: z.record(z.string(), jsonSchema).default({}),
 });
 
 export const addWidget = createServerFn({ method: "POST" })
