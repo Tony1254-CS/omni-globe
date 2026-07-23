@@ -38,6 +38,7 @@ function ClientGrid({
   children: ReactNode;
 }) {
   const [pending, setPending] = useState<Layout | null>(null);
+  const [resizing, setResizing] = useState(false);
   const lastSaved = useRef("");
   useEffect(() => {
     if (!pending) return;
@@ -54,7 +55,7 @@ function ClientGrid({
 
   return (
     <ResponsiveGrid
-      className="layout"
+      className={resizing ? "layout is-resizing" : "layout"}
       layout={items}
       cols={12}
       rowHeight={60}
@@ -63,7 +64,9 @@ function ClientGrid({
       onLayoutChange={(next: Layout) => setPending(next)}
       compactType="vertical"
       isResizable
-      resizeHandles={["se"]}
+      resizeHandles={["se", "sw", "e", "w", "s"]}
+      onResizeStart={() => setResizing(true)}
+      onResizeStop={() => setResizing(false)}
     >
       {children}
     </ResponsiveGrid>

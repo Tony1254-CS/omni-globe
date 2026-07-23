@@ -50,7 +50,15 @@ export async function fetchWidgetData(type: string, settings: WidgetSettings): P
     case "earthquakes": {
       const min = Math.max(0, Math.min(10, number(settings.minMagnitude, 2.5)));
       const feed = await json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson");
-      const events = (feed.features ?? []).filter((e: any) => number(e.properties?.mag, 0) >= min).slice(0, 12).map((e: any) => ({ id: e.id, magnitude: e.properties.mag, place: e.properties.place, time: e.properties.time, url: e.properties.url }));
+      const events = (feed.features ?? []).filter((e: any) => number(e.properties?.mag, 0) >= min).slice(0, 40).map((e: any) => ({
+        id: e.id,
+        magnitude: e.properties.mag,
+        place: e.properties.place,
+        time: e.properties.time,
+        url: e.properties.url,
+        lat: number(e.geometry?.coordinates?.[1], 0),
+        lon: number(e.geometry?.coordinates?.[0], 0),
+      }));
       return result(type, "USGS", { minMagnitude: min, events });
     }
     case "iss": {
