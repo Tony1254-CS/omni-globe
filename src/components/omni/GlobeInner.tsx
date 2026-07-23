@@ -114,48 +114,79 @@ function GlobeCanvas({ historicalDate, historicalImageUrl, historicalQuakes, fly
   useEffect(() => {
     if (!ready || !globeRef.current) return;
     const controls = globeRef.current.controls?.();
-    if (controls) controls.autoRotate = autoRotate;
-  }, [autoRotate, ready]);
+    if (controls) controls.autoRotate = autoRotate && !historicalDate;
+  }, [autoRotate, ready, historicalDate]);
 
-  // Points layer: quakes + ISS + favourites
+  const isHistorical = !!historicalDate;
+
+  // Swap the globe basemap image when historical date changes.
+  useEffect(() => {
+    if (!ready || !globeRef.current) return;
+    const g = globeRef.current;
+    if (isHistorical && historicalImageUrl) {
+      g.globeImageUrl(historicalImageUrl);
+    } else {
+      g.globeImageUrl(earthNight);
+    }
+  }, [ready, isHistorical, historicalImageUrl]);
+
+  // Fly-to on milestone jump.
+  useEffect(() => {
+    if (!ready || !globeRef.current || !flyTo) return;
+    globeRef.current.pointOfView({ lat: flyTo.lat, lng: flyTo.lon, altitude: 1.8 }, 1500);
+  }, [ready, flyTo]);
+
+  // Points layer: quakes + ISS + favourites (live) OR historical quakes only.
   useEffect(() => {
     if (!ready || !globeRef.current) return;
     const g = globeRef.current;
     const points: Array<{ lat: number; lng: number; size: number; color: string; label: string; kind: string; url?: string }> = [];
 
-    if (showQuakes) {
-      for (const q of quakesFull.data ?? []) {
+    if (isHistorical) {
+      for (const q of historicalQuakes ?? []) {
         points.push({
           lat: q.lat,
           lng: q.lon,
-          size: 0.15 + Math.max(0, q.magnitude) * 0.08,
-          color: q.magnitude >= 5 ? "#ef4444" : q.magnitude >= 3.5 ? "#f59e0b" : "#38bdf8",
+          size: 0.25 + Math.max(0, q.magnitude - 4) * 0.12,
+          color: q.magnitude >= 7 ? "#ef4444" : q.magnitude >= 5.5 ? "#f97316" : "#f59e0b",
           label: `M${q.magnitude.toFixed(1)} · ${q.place}`,
-          kind: "quake",
+          kind: "quake-hist",
           url: q.url,
         });
       }
-    }
-    if (showIss && issPos) {
-      points.push({
-        lat: issPos.latitude,
-        lng: issPos.longitude,
-        size: 0.6,
-        color: "#a78bfa",
-        label: `ISS · ${issPos.altitude.toFixed(0)} km · ${issPos.velocity.toFixed(0)} km/h`,
-        kind: "iss",
-      });
-    }
-    if (showFavs) {
-      for (const f of favs.data ?? []) {
+      if (showFavs) {
+        for (const f of favs.data ?? []) {
+          points.push({ lat: Number(f.lat), lng: Number(f.lon), size: 0.5, color: "#22d3ee", label: `★ ${f.label}`, kind: "fav" });
+        }
+      }
+    } else {
+      if (showQuakes) {
+        for (const q of quakesFull.data ?? []) {
+          points.push({
+            lat: q.lat,
+            lng: q.lon,
+            size: 0.15 + Math.max(0, q.magnitude) * 0.08,
+            color: q.magnitude >= 5 ? "#ef4444" : q.magnitude >= 3.5 ? "#f59e0b" : "#38bdf8",
+            label: `M${q.magnitude.toFixed(1)} · ${q.place}`,
+            kind: "quake",
+            url: q.url,
+          });
+        }
+      }
+      if (showIss && issPos) {
         points.push({
-          lat: Number(f.lat),
-          lng: Number(f.lon),
-          size: 0.5,
-          color: "#22d3ee",
-          label: `★ ${f.label}`,
-          kind: "fav",
+          lat: issPos.latitude,
+          lng: issPos.longitude,
+          size: 0.6,
+          color: "#a78bfa",
+          label: `ISS · ${issPos.altitude.toFixed(0)} km · ${issPos.velocity.toFixed(0)} km/h`,
+          kind: "iss",
         });
+      }
+      if (showFavs) {
+        for (const f of favs.data ?? []) {
+          points.push({ lat: Number(f.lat), lng: Number(f.lon), size: 0.5, color: "#22d3ee", label: `★ ${f.label}`, kind: "fav" });
+        }
       }
     }
 
@@ -171,7 +202,8 @@ function GlobeCanvas({ historicalDate, historicalImageUrl, historicalQuakes, fly
       .onPointClick((d: any) => {
         if (d?.url) window.open(d.url, "_blank", "noopener");
       });
-  }, [ready, showIss, showQuakes, showFavs, issPos, quakesFull.data, favs.data]);
+  }, [ready, showIss, showQuakes, showFavs, issPos, quakesFull.data, favs.data, isHistorical, historicalQuakes]);
+
 
   return (
     <div className="relative">
