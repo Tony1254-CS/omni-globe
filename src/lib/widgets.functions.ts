@@ -21,7 +21,7 @@ const jsonSchema: z.ZodType<JsonValue> = z.lazy(() =>
 const NewWidget = z.object({
   widget_type: z.string().min(1).max(60),
   x: z.number().int().min(0).max(48).default(0),
-  y: z.number().int().min(0).max(200).default(0),
+  y: z.number().int().min(0).max(10000).default(0),
   w: z.number().int().min(1).max(24).default(4),
   h: z.number().int().min(1).max(24).default(4),
   settings: z.record(z.string(), jsonSchema).default({}),
