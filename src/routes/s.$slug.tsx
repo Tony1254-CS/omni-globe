@@ -46,7 +46,7 @@ function PublicShare() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {widgets.map((w, i) => (
             <Card key={i} className="glass-panel min-h-[200px] p-3">
-              <LiveWidget widget={{ id: `pub-${i}`, widget_type: w.widget_type, settings: w.settings }} readOnly />
+              <LiveWidget id={`pub-${i}`} type={w.widget_type} settings={w.settings} />
             </Card>
           ))}
           {widgets.length === 0 && <p className="text-sm text-muted-foreground">Empty snapshot.</p>}
