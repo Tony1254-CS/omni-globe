@@ -1,5 +1,19 @@
 import type { WidgetDataResult, WidgetDataValue, WidgetSettings } from "./widget-data.types";
 
+type CacheEntry = { value?: WidgetDataResult; expiresAt: number; retryAt: number; failures: number; pending?: Promise<WidgetDataResult> };
+const providerCache = new Map<string, CacheEntry>();
+const CACHE_TTL: Record<string, number> = {
+  iss: 15_000, weather: 10 * 60_000, aqi: 15 * 60_000, earthquakes: 5 * 60_000,
+  crypto: 2 * 60_000, fx: 30 * 60_000, news: 10 * 60_000, reddit: 10 * 60_000,
+  spacex: 30 * 60_000, apod: 6 * 60 * 60_000, mars: 6 * 60 * 60_000,
+  neo: 60 * 60_000, countries: 24 * 60 * 60_000, github: 30 * 60_000,
+  quote: 24 * 60 * 60_000, covid: 60 * 60_000, clocks: 1_000,
+};
+
+class ProviderError extends Error {
+  constructor(message: string, public status: number, public retryAfter = 0) { super(message); }
+}
+
 const number = (value: unknown, fallback: number) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -13,7 +27,11 @@ async function json(url: string) {
     headers: { Accept: "application/json", "User-Agent": "OmniSphere/1.0" },
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`Data provider returned ${response.status}`);
+  if (!response.ok) {
+    const retryHeader = response.headers.get("retry-after");
+    const retryAfter = retryHeader ? Math.max(0, Number(retryHeader) * 1000) : 0;
+    throw new ProviderError(`Data provider returned ${response.status}`, response.status, retryAfter);
+  }
   return response.json() as Promise<any>;
 }
 
@@ -43,14 +61,52 @@ function decodeXml(value: string) {
     .trim();
 }
 
+const stableSettings = (settings: WidgetSettings) => Object.fromEntries(Object.entries(settings).sort(([a], [b]) => a.localeCompare(b)));
+
 export async function fetchWidgetData(type: string, settings: WidgetSettings): Promise<WidgetDataResult> {
+  const cacheKey = `${type}:${JSON.stringify(stableSettings(settings))}`;
+  const now = Date.now();
+  const cached = providerCache.get(cacheKey);
+  if (cached?.value && cached.expiresAt > now) return cached.value;
+  if (cached?.retryAt && cached.retryAt > now) {
+    if (cached.value) return { ...cached.value, stale: true, status: "cached", retryAt: new Date(cached.retryAt).toISOString() };
+    throw new ProviderError("Provider cooling down after too many requests", 429, cached.retryAt - now);
+  }
+  if (cached?.pending) return cached.pending;
+
+  const pending = fetchWidgetDataFresh(type, settings).then((value) => {
+    providerCache.set(cacheKey, { value: { ...value, status: "live" }, expiresAt: Date.now() + (CACHE_TTL[type] ?? 5 * 60_000), retryAt: 0, failures: 0 });
+    return { ...value, status: "live" as const };
+  }).catch((error: unknown) => {
+    const previous = providerCache.get(cacheKey);
+    const failures = (previous?.failures ?? 0) + 1;
+    const providerRetry = error instanceof ProviderError ? error.retryAfter : 0;
+    const cooldown = Math.max(providerRetry, Math.min(30 * 60_000, 30_000 * 2 ** Math.min(failures - 1, 6)));
+    const retryAt = Date.now() + cooldown;
+    providerCache.set(cacheKey, { value: previous?.value, expiresAt: 0, retryAt, failures });
+    if (previous?.value) return { ...previous.value, stale: true, status: "cached" as const, retryAt: new Date(retryAt).toISOString() };
+    throw Object.assign(error instanceof Error ? error : new Error("Data source unavailable"), { retryAt });
+  });
+  providerCache.set(cacheKey, { ...(cached ?? { expiresAt: 0, retryAt: 0, failures: 0 }), pending });
+  return pending;
+}
+
+async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Promise<WidgetDataResult> {
   const lat = Math.max(-90, Math.min(90, number(settings.lat, 51.5072)));
   const lon = Math.max(-180, Math.min(180, number(settings.lon, -0.1276)));
 
   switch (type) {
     case "weather": {
-      const data = await json(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto`);
-      return result(type, "Open-Meteo", { label: text(settings.label, "Selected location"), ...data });
+      try {
+        const data = await json(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto`);
+        return result(type, "Open-Meteo", { label: text(settings.label, "Selected location"), ...data });
+      } catch (primaryError) {
+        const compact = await json(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`);
+        const series = compact.properties?.timeseries ?? [];
+        const current = series[0]?.data?.instant?.details ?? {};
+        const days = series.filter((_: unknown, index: number) => index % 24 === 0).slice(0, 5);
+        return result(type, "MET Norway fallback", { label: text(settings.label, "Selected location"), current: { temperature_2m: current.air_temperature, apparent_temperature: current.air_temperature, relative_humidity_2m: current.relative_humidity, wind_speed_10m: current.wind_speed }, daily: { time: days.map((d: any) => d.time.slice(0, 10)), temperature_2m_max: days.map((d: any) => d.data?.instant?.details?.air_temperature), temperature_2m_min: days.map((d: any) => d.data?.instant?.details?.air_temperature) }, fallbackReason: primaryError instanceof Error ? primaryError.message : "Primary unavailable" });
+      }
     }
     case "aqi": {
       const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5,nitrogen_dioxide,ozone&timezone=auto`);

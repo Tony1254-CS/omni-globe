@@ -15,12 +15,16 @@ export const getWidgetData = createServerFn({ method: "POST" })
     try {
       return await fetchWidgetData(data.type, data.settings);
     } catch (err) {
+      const retryAt = typeof err === "object" && err && "retryAt" in err ? new Date(Number((err as { retryAt: number }).retryAt)).toISOString() : undefined;
+      const rateLimited = err instanceof Error && /429|cooling down/i.test(err.message);
       return {
         type: data.type,
         source: "error",
         updatedAt: new Date().toISOString(),
         data: null,
         error: err instanceof Error ? err.message : "Failed to load data",
+        retryAt,
+        status: rateLimited ? "rate-limited" as const : "unavailable" as const,
       };
     }
   });

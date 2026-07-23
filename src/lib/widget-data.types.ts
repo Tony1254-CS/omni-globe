@@ -14,6 +14,9 @@ export type WidgetDataResult = {
   updatedAt: string;
   data: WidgetDataValue;
   error?: string;
+  stale?: boolean;
+  retryAt?: string;
+  status?: "live" | "cached" | "rate-limited" | "unavailable";
 };
 
 export const DEFAULT_WIDGET_SETTINGS: Record<string, WidgetSettings> = {
