@@ -1,61 +1,68 @@
+# Plan: Write `PROJECT_GUIDE.md` — the complete beginner-friendly guide to OMNISPHERE
 
-# Premium Polish Pass
+Create one large, well-organized Markdown file at the project root: **`PROJECT_GUIDE.md`**. It will be the single source of truth for what OMNISPHERE is, how to use it, how it is built, and what every folder and file does — written so a non-coder can follow along.
 
-Goal: keep the current clean UI, but make it feel Apple-grade — instant, fluid, tactile, and correct on every screen size. No feature changes, no backend changes.
+## Goals
 
-## 1. Motion system (snappy + smooth)
+- One file, no code changes anywhere else.
+- Plain English first, technical detail second (in clearly-labeled subsections).
+- Cover **every** top-level folder and **every** meaningful file in `src/`, `supabase/`, and the project root.
+- Explain **why** each piece exists, not just what it is.
 
-- Add a shared motion token set in `src/styles.css`:
-  - `--ease-out-quint: cubic-bezier(.22,1,.36,1)`
-  - `--ease-spring: cubic-bezier(.34,1.56,.64,1)`
-  - `--dur-fast: 140ms`, `--dur-base: 220ms`, `--dur-slow: 420ms`
-- Standardize every transition on these tokens (sidebar, widgets, buttons, dialogs, tabs, popovers).
-- Replace long 480–900ms transitions on `.widget-surface` and `.glass-specular` with `--dur-base`/`--dur-slow` so hover feels instant, not draggy.
-- Add `will-change: transform` only on hover-lifted elements; remove after transition to keep GPU layers cheap.
-- Respect `prefers-reduced-motion` (already partially handled — extend to new tokens).
+## Document outline
 
-## 2. Snappiness (perceived speed)
+1. **What is OMNISPHERE?** — one-paragraph pitch + tagline + who it's for.
+2. **Screenshots / Tour** — page-by-page walkthrough of Pulse, Dashboard, Globe, Oracle, Foresight, Briefing, Alerts, Automations, Agents, Devices, Presets, Shares, Achievements, History, Settings. What each does, when to use it.
+3. **How to use it (non-technical)** — sign in, set home location, pick widgets, resize, share, generate a Pulse, ask the Oracle, set an alert, etc.
+4. **Feature catalogue** — grouped list (Live Widgets, 3D Globe, Time Machine, Pulse, Foresight, Oracle, Briefing, Alerts, Automations, Agents, Devices, Presets, Achievements, Shares, Trust Layer, Themes, Responsive/Mobile).
+5. **The tech stack — explained like you're new**
+   - React 19 + TanStack Start (why: full-stack React with SSR + server functions)
+   - TanStack Router (file-based routing)
+   - TanStack Query (data fetching + caching)
+   - Vite 7 (build tool)
+   - Tailwind CSS v4 + shadcn/ui (styling + components)
+   - Lovable Cloud = Supabase under the hood (Postgres, Auth, Storage, RLS)
+   - Lovable AI Gateway (Gemini models for Pulse, Oracle, Briefing, Agents, Foresight)
+   - Cloudflare Workers runtime (where the server code runs)
+   - `globe.gl` + Three.js (3D globe)
+   - `react-grid-layout` (drag/resize dashboard)
+   - `recharts` (history charts)
+   - Zod (input validation)
+   - For each: **what it is**, **why we chose it**, **where it shows up in the code**.
+6. **Architecture at a glance** — an ASCII diagram showing Browser → TanStack Router → Server Functions → Supabase / External APIs / AI Gateway, plus the `provider_cache` warming loop.
+7. **Data flow examples** — trace two real journeys end-to-end in plain language: (a) "I open the Weather widget" and (b) "I click Generate Pulse".
+8. **Folder-by-folder, file-by-file reference** — the big section:
+   - Project root: `package.json`, `vite.config.ts`, `tsconfig.json`, `components.json`, `eslint.config.js`, `bunfig.toml`, `.env`, `.prettierrc`, `AGENTS.md`, `README.md`, `.lovable/`.
+   - `public/` — favicon and static assets.
+   - `src/` overview.
+   - `src/routes/` — every route file, what URL it maps to, what it renders. Explain `__root.tsx`, `_authenticated/route.tsx`, `auth.tsx`, `index.tsx`, `s.$slug.tsx`, and every page under `_authenticated/`. Explain `api/public/hooks/*` webhooks.
+   - `src/components/omni/` — every component (AppShell, LayoutGrid, LiveWidget, WidgetShell, WidgetPicker, GlobeInner, LocationSearch, TimelineScrubber, MilestoneNarration, OnThisDayTray, AttentionBadge, ForecastCard, TrustBadge, theme-provider).
+   - `src/lib/` — every `.functions.ts` (client-callable server RPC) paired with its `.server.ts` (server-only logic): pulse, foresight, oracle, briefing, agents, alerts, automations, devices, achievements, presets, shares, favourites, forecast, history-data, timemachine, widget-data, widgets, location, profile. Plus helpers: `anomaly.ts`, `format.ts`, `utils.ts`, `presets.ts`, `error-capture.ts`, `error-page.ts`, `lovable-error-reporting.ts`.
+   - `src/integrations/supabase/` — client.ts, client.server.ts, auth-middleware.ts, auth-attacher.ts, types.ts (mark as auto-generated).
+   - `src/hooks/` — use-mobile, use-debounce.
+   - `src/styles.css` — design tokens, liquid-glass system, motion tokens.
+   - `src/router.tsx`, `src/start.ts`, `src/server.ts` — the boot chain, explained.
+   - `supabase/` — `config.toml` and `migrations/` (summarize each migration by what tables/policies it added).
+   - Generated files to **never** touch: `src/routeTree.gen.ts`, `src/integrations/supabase/*` (auto-gen ones), `.env`.
+9. **The database** — plain-English table catalogue: `profiles`, `user_roles`, `favourite_locations`, `widget_configs`, `alerts`, `alert_events`, `automations`, `automation_runs`, `agents`, `agent_runs`, `devices`, `device_readings`, `achievements`, `pulses`, `predictions`, `briefings`, `shared_dashboards`, `personal_milestones`, `calendar_events`, `client_errors`, `provider_cache`. For each: what it stores, who can read/write (RLS in one sentence).
+10. **Security model** — Auth via Supabase, RLS on every table, roles in a separate `user_roles` table, `has_role` security-definer, webhook HMAC verification, no service-role secrets exposed.
+11. **External data providers** — table of every API used (Open-Meteo, MET Norway, NASA POWER/GIBS/APOD/Image Library, USGS, Launch Library 2, CoinGecko, ExchangeRate, GDELT, Hacker News, BBC RSS, ISS Open Notify, disease.sh COVID) with what widget uses it and the fallback if it fails.
+12. **AI usage** — which pages call the AI gateway, which Gemini model, what prompt shape, and cost/rate-limit behavior.
+13. **Caching + reliability** — `provider_cache` explained: how the "serve-stale-while-refreshing" and cooldown logic keeps widgets alive under rate limits; the `refresh-widgets` warmer webhook.
+14. **Design system** — the liquid-glass tokens, motion tokens (`--ease-out-quint`, durations), light/dark theme, focus/press states, mobile behavior.
+15. **How to run it locally / how to publish** — dev server, environment variables that Lovable manages for you, publishing from the Lovable UI.
+16. **Glossary for non-coders** — RLS, server function, SSR, cache, RPC, webhook, HMAC, JWT, migration, Zod, provider, in one line each.
+17. **FAQ / troubleshooting** — "a widget says cooling down", "clocks aren't ticking", "I can't sign in", "Pulse says rate limit", etc.
 
-- Enable route preloading: `defaultPreload: "intent"` in `src/router.tsx` (currently only `defaultPreloadStaleTime: 0`) so hovering a sidebar link warms the route + loader.
-- Add optimistic hover state to sidebar links and widget cards (translate + shadow within 120ms).
-- Add `content-visibility: auto` + `contain-intrinsic-size` to off-screen widget cards for faster scroll/paint on the dashboard.
-- Debounce grid layout persistence in `LayoutGrid` (already immediate) → coalesce to 250ms so drag/resize doesn't jank on network writes.
-- Add skeleton shimmer that matches final layout dimensions (prevents layout shift when `LiveWidget` resolves).
+## Tone and formatting rules
 
-## 3. Micro-interactions (tactile)
+- Short sentences. Plain words first, jargon in parentheses.
+- Headings, tables, and bullet lists — no walls of text.
+- Every folder/file entry uses the same 3-line shape: **Path** / **What it is** / **Why it exists**.
+- Never expose Supabase project IDs or dashboard links.
+- No code changes anywhere else in the repo.
 
-- Buttons: unify `.liquid-control` + `.primary-glass-button` press feedback (scale 0.97, 120ms) and add subtle inner highlight on active.
-- Sidebar: icon springs (scale 1.0 → 1.08) on hover with `--ease-spring`; active rail indicator animates height/position instead of hard-swapping.
-- Widget cards: hover lift capped at `translateY(-2px)` (currently -3px feels floaty at small sizes); add specular sheen sweep only on pointer:fine devices.
-- Tabs / dialogs / popovers: use `animate-in fade-in-0 zoom-in-95` from `tw-animate-css` consistently.
-- Focus rings: crisp 2px `--ring` with 2px offset, visible only on `:focus-visible`.
+## Deliverable
 
-## 4. Responsive behavior
-
-- Dashboard grid: verify breakpoints in `LayoutGrid` — add a proper `xxs` (< 480px) single-column layout, and shrink row height on mobile so widgets stay readable.
-- `AppShell` sidebar: on `< 768px`, collapse into a bottom-safe floating pill or slide-over sheet (hover-to-expand doesn't work on touch); use `useIsMobile`.
-- Header rows across pages (History, Pulse, Foresight, Oracle, Globe): apply the `grid-cols-[minmax(0,1fr)_auto]` + `min-w-0` + `truncate` pattern from responsive-layout guidance so titles + controls never clip on mobile.
-- Command bar: stack vertically under `sm`, full-width inputs.
-- Typography: clamp headline sizes (`clamp(1.5rem, 2.5vw, 2.25rem)`) so nothing overflows on 320–420px widths.
-- Globe canvas: cap DPR on mobile (`renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))`) for smoother frames.
-
-## 5. Performance touch-ups
-
-- Add `loading="lazy"` + `decoding="async"` to any `<img>` outside the viewport (APOD, Mars, share cards).
-- Memoize heavy widget renderers (`LiveWidget` body per widget type) to avoid re-render storms on grid drag.
-- Ensure Recharts on `/history` uses `ResponsiveContainer` with a fixed aspect ratio to avoid re-measure loops.
-
-## Files touched (frontend/presentation only)
-
-- `src/styles.css` — motion tokens, transition durations, focus/press states, content-visibility, reduced-motion.
-- `src/router.tsx` — add `defaultPreload: "intent"`.
-- `src/components/omni/AppShell.tsx` — mobile sidebar behavior, spring hover, icon micro-interactions.
-- `src/components/omni/LayoutGrid.tsx` — xxs breakpoint, debounced persistence, skeleton sizing.
-- `src/components/omni/LiveWidget.tsx` — memoization, lazy media, tighter skeleton.
-- `src/components/omni/WidgetShell.tsx` — hover/press polish, will-change hygiene.
-- `src/components/omni/GlobeInner.tsx` — DPR cap on mobile.
-- Route files (`_authenticated/*.tsx`) — header row responsive pattern; no logic changes.
-
-## Out of scope
-
-- No new features, no data/provider changes, no schema changes, no copy rewrites, no palette changes.
+- New file: `PROJECT_GUIDE.md` at the repo root. Expected size ~1,500–2,500 lines of Markdown so it truly covers "everything".
+- No other files touched.
