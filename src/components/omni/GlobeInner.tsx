@@ -32,13 +32,6 @@ function GlobeCanvas() {
     staleTime: 5000,
   });
 
-  const quakes = useQuery({
-    queryKey: ["globe-quakes"],
-    queryFn: () => fetchData({ data: { type: "earthquakes", settings: { minMagnitude: 2.5 } } }),
-    staleTime: 5 * 60_000,
-    refetchInterval: 5 * 60_000,
-  });
-
   const favs = useQuery({
     queryKey: ["favourites"],
     queryFn: () => favsFn(),
