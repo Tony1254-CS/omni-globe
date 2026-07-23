@@ -66,7 +66,8 @@ function GlobeCanvas() {
     (async () => {
       const mod = await import("globe.gl");
       if (cancelled || !containerRef.current) return;
-      const g = (mod.default as any)(containerRef.current)
+      const createGlobe = mod.default as any;
+      const g = createGlobe()(containerRef.current)
         .globeImageUrl(earthNight)
         .bumpImageUrl(earthTopology)
         .backgroundColor("rgba(0,0,0,0)")
