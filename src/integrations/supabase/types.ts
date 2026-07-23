@@ -261,6 +261,42 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_events: {
+        Row: {
+          created_at: string
+          ends_at: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          starts_at: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          starts_at: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          starts_at?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       client_errors: {
         Row: {
           created_at: string
@@ -412,6 +448,68 @@ export type Database = {
           kind?: string
           meta?: Json
           title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      oracle_messages: {
+        Row: {
+          content: string
+          created_at: string
+          graph: Json | null
+          id: string
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          graph?: Json | null
+          id?: string
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          graph?: Json | null
+          id?: string
+          role?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oracle_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "oracle_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oracle_threads: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
