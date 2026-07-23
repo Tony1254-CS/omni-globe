@@ -8,16 +8,17 @@ async function evaluateTrigger(trig: string, params: Record<string, unknown>): P
       const coin = String(params.coin ?? "bitcoin");
       const cmp = String(params.comparator ?? "gt");
       const threshold = Number(params.threshold ?? 0);
-      const raw = (await fetchWidgetData("crypto", { coins: coin })) as { data: { prices: Array<{ id: string; usd: number }> } };
-      const price = raw.data.prices.find((p) => p.id === coin)?.usd;
+      const raw = (await fetchWidgetData("crypto", { coins: coin })) as unknown as { data: { prices: Array<{ id: string; usd: number }> } };
+      const price = raw.data?.prices?.find((p) => p.id === coin)?.usd;
       if (price == null) return { hit: false };
       const hit = cmp === "gt" ? price > threshold : price < threshold;
       return { hit, value: price, detail: `${coin} $${price}` };
     }
     if (trig === "earthquake") {
       const minMag = Number(params.minMagnitude ?? 5);
-      const raw = (await fetchWidgetData("earthquakes", { minMagnitude: minMag })) as { data: { quakes: Array<{ mag: number; place: string }> } };
-      const worst = raw.data.quakes.reduce((max, q) => (q.mag > max.mag ? q : max), raw.data.quakes[0] ?? { mag: 0, place: "" });
+      const raw = (await fetchWidgetData("earthquakes", { minMagnitude: minMag })) as unknown as { data: { quakes: Array<{ mag: number; place: string }> } };
+      const quakes = raw.data?.quakes ?? [];
+      const worst = quakes.reduce<{ mag: number; place: string } | null>((max, q) => (!max || q.mag > max.mag ? q : max), null);
       if (!worst || worst.mag < minMag) return { hit: false };
       return { hit: true, value: worst.mag, detail: `M${worst.mag} ${worst.place}` };
     }
@@ -30,13 +31,8 @@ async function evaluateTrigger(trig: string, params: Record<string, unknown>): P
   }
 }
 
-async function runAction(
-  admin: ReturnType<typeof createClient>,
-  userId: string,
-  kind: string,
-  params: Record<string, unknown>,
-  detail: string,
-) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function runAction(admin: any, userId: string, kind: string, params: Record<string, unknown>, detail: string) {
   if (kind === "notify" || kind === "journal") {
     await admin.from("journal").insert({
       user_id: userId,
@@ -47,7 +43,6 @@ async function runAction(
     return;
   }
   if (kind === "briefing") {
-    // Insert a stub briefing entry; the user can regenerate on the briefing page.
     await admin.from("journal").insert({
       user_id: userId,
       kind: "briefing_request",
@@ -65,7 +60,8 @@ export const Route = createFileRoute("/api/public/hooks/run-automations")({
         if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
           return new Response("misconfigured", { status: 500 });
         }
-        const admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const admin: any = createClient<any>(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
           auth: { persistSession: false, autoRefreshToken: false },
         });
 
@@ -76,7 +72,7 @@ export const Route = createFileRoute("/api/public/hooks/run-automations")({
         if (error) return Response.json({ error: error.message }, { status: 500 });
 
         let fired = 0;
-        for (const r of rules ?? []) {
+        for (const r of (rules ?? []) as Array<Record<string, unknown>>) {
           const result = await evaluateTrigger(r.trigger_kind as string, (r.trigger_params as Record<string, unknown>) ?? {});
           const status = result.hit ? "fired" : "skipped";
           if (result.hit) {
