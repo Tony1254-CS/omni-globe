@@ -1,15 +1,23 @@
 import type { WidgetDataResult, WidgetDataValue, WidgetSettings } from "./widget-data.types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-type CacheEntry = { value?: WidgetDataResult; expiresAt: number; retryAt: number; failures: number; pending?: Promise<WidgetDataResult> };
+// v4: cache-key bump — invalidates all stale/error rows from prior versions
+const CACHE_VERSION = "v4";
+
+type CacheEntry = { value?: WidgetDataResult; expiresAt: number; retryAt: number; pending?: Promise<WidgetDataResult> };
 const providerCache = new Map<string, CacheEntry>();
+
+// Longer TTLs (fresh window) — after this we still serve the cached value but trigger a background refresh.
 const CACHE_TTL: Record<string, number> = {
-  iss: 15_000, weather: 10 * 60_000, aqi: 15 * 60_000, earthquakes: 5 * 60_000,
-  crypto: 2 * 60_000, fx: 30 * 60_000, news: 10 * 60_000, reddit: 10 * 60_000,
-  spacex: 30 * 60_000, apod: 6 * 60 * 60_000, mars: 6 * 60 * 60_000,
-  neo: 60 * 60_000, countries: 24 * 60 * 60_000, github: 30 * 60_000,
+  iss: 20_000, weather: 15 * 60_000, aqi: 20 * 60_000, earthquakes: 10 * 60_000,
+  crypto: 3 * 60_000, fx: 60 * 60_000, news: 15 * 60_000, reddit: 15 * 60_000,
+  spacex: 60 * 60_000, apod: 6 * 60 * 60_000, mars: 6 * 60 * 60_000,
+  neo: 6 * 60 * 60_000, countries: 24 * 60 * 60_000, github: 60 * 60_000,
   quote: 24 * 60 * 60_000, covid: 60 * 60_000, clocks: 1_000,
 };
+
+// Short soft cooldown after failure. We never lock the widget for long, and we always keep serving any cached value.
+const SOFT_COOLDOWN_MS = 2 * 60_000;
 
 class ProviderError extends Error {
   constructor(message: string, public status: number, public retryAfter = 0) { super(message); }
@@ -19,13 +27,12 @@ const number = (value: unknown, fallback: number) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
-
 const text = (value: unknown, fallback: string) =>
   typeof value === "string" && value.trim() ? value.trim() : fallback;
 
-async function json(url: string) {
+async function json(url: string, extraHeaders: Record<string, string> = {}) {
   const response = await fetch(url, {
-    headers: { Accept: "application/json", "User-Agent": "OmniSphere/1.0" },
+    headers: { Accept: "application/json", "User-Agent": "OmniSphere/2.0 (+https://omni-globe.lovable.app)", ...extraHeaders },
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) {
@@ -40,7 +47,7 @@ async function feed(url: string) {
   const response = await fetch(url, {
     headers: {
       Accept: "application/atom+xml, application/rss+xml, application/xml, text/xml",
-      "User-Agent": "OmniSphere global-awareness-dashboard/2.0",
+      "User-Agent": "OmniSphere/2.0 (+https://omni-globe.lovable.app)",
     },
     signal: AbortSignal.timeout(10000),
   });
@@ -58,19 +65,14 @@ async function jsonWithFallback(primary: string, fallback?: string) {
 }
 
 const result = (type: string, source: string, data: WidgetDataValue): WidgetDataResult => ({
-  type,
-  source,
-  updatedAt: new Date().toISOString(),
-  data,
+  type, source, updatedAt: new Date().toISOString(), data,
 });
 
 function decodeXml(value: string) {
   return value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
     .trim();
 }
 
@@ -105,44 +107,69 @@ function issPositionFromElements(element: Record<string, unknown>, at = new Date
 
 const stableSettings = (settings: WidgetSettings) => Object.fromEntries(Object.entries(settings).sort(([a], [b]) => a.localeCompare(b)));
 
+/**
+ * Read-through, always-serve-stale cache.
+ * - If any cached value exists (fresh OR stale), return it immediately.
+ * - When it's stale, kick off a background refresh (fire and forget).
+ * - On failure, keep serving the stale value; short 2 min soft cooldown to
+ *   throttle retries, but NEVER lock the user out for 30 min like the old code.
+ */
 export async function fetchWidgetData(type: string, settings: WidgetSettings): Promise<WidgetDataResult> {
-  const cacheVersion = type === "iss" ? "v3:" : "";
-  const cacheKey = `${cacheVersion}${type}:${JSON.stringify(stableSettings(settings))}`;
+  const cacheKey = `${CACHE_VERSION}:${type}:${JSON.stringify(stableSettings(settings))}`;
   const now = Date.now();
   let cached = providerCache.get(cacheKey);
+
+  // Cold worker: hydrate in-memory from Supabase row (any age).
   if (!cached) {
     const { data } = await supabaseAdmin.from("provider_cache").select("payload, expires_at").eq("cache_key", cacheKey).maybeSingle();
     if (data?.payload && typeof data.payload === "object" && !Array.isArray(data.payload)) {
-      const value = data.payload as unknown as WidgetDataResult;
-      cached = { value, expiresAt: new Date(data.expires_at).getTime(), retryAt: 0, failures: 0 };
+      cached = { value: data.payload as unknown as WidgetDataResult, expiresAt: new Date(data.expires_at).getTime(), retryAt: 0 };
       providerCache.set(cacheKey, cached);
     }
   }
-  if (cached?.value && cached.expiresAt > now) return cached.value;
-  if (cached?.retryAt && cached.retryAt > now) {
-    if (cached.value) return { ...cached.value, stale: true, status: "cached", retryAt: new Date(cached.retryAt).toISOString() };
-    throw new ProviderError("Provider cooling down after too many requests", 429, cached.retryAt - now);
-  }
-  if (cached?.pending) return cached.pending;
 
-  const pending = fetchWidgetDataFresh(type, settings).then((value) => {
-    const expiresAt = Date.now() + (CACHE_TTL[type] ?? 5 * 60_000);
-    const liveValue = { ...value, status: "live" as const };
-    providerCache.set(cacheKey, { value: liveValue, expiresAt, retryAt: 0, failures: 0 });
-    void supabaseAdmin.from("provider_cache").upsert({ cache_key: cacheKey, payload: liveValue as any, expires_at: new Date(expiresAt).toISOString(), created_at: new Date().toISOString() });
-    return { ...value, status: "live" as const };
-  }).catch((error: unknown) => {
-    const previous = providerCache.get(cacheKey);
-    const failures = (previous?.failures ?? 0) + 1;
-    const providerRetry = error instanceof ProviderError ? error.retryAfter : 0;
-    const cooldown = Math.max(providerRetry, Math.min(30 * 60_000, 30_000 * 2 ** Math.min(failures - 1, 6)));
-    const retryAt = Date.now() + cooldown;
-    providerCache.set(cacheKey, { value: previous?.value, expiresAt: 0, retryAt, failures });
-    if (previous?.value) return { ...previous.value, stale: true, status: "cached" as const, retryAt: new Date(retryAt).toISOString() };
-    throw Object.assign(error instanceof Error ? error : new Error("Data source unavailable"), { retryAt });
-  });
-  providerCache.set(cacheKey, { ...(cached ?? { expiresAt: 0, retryAt: 0, failures: 0 }), pending });
+  const isFresh = cached?.value && cached.expiresAt > now;
+  const inCooldown = cached?.retryAt && cached.retryAt > now;
+
+  // Fresh — just serve.
+  if (isFresh) return { ...cached!.value!, status: "live" };
+
+  // Stale or missing. If we already have a fetch in flight, prefer it when there's nothing cached; otherwise return stale immediately.
+  if (cached?.pending && !cached.value) return cached.pending;
+
+  // If we have any cached value, serve it and (unless cooling down) refresh in background.
+  if (cached?.value) {
+    if (!inCooldown && !cached.pending) {
+      const pending = refresh(type, settings, cacheKey).catch(() => undefined);
+      providerCache.set(cacheKey, { ...cached, pending: pending as Promise<WidgetDataResult> });
+    }
+    return { ...cached.value, stale: true, status: inCooldown ? "cached" : "cached" };
+  }
+
+  // Nothing cached at all — try fresh once, and if that also fails, throw.
+  const pending = refresh(type, settings, cacheKey);
+  providerCache.set(cacheKey, { ...(cached ?? { expiresAt: 0, retryAt: 0 }), pending });
   return pending;
+}
+
+async function refresh(type: string, settings: WidgetSettings, cacheKey: string): Promise<WidgetDataResult> {
+  try {
+    const value = await fetchWidgetDataFresh(type, settings);
+    const expiresAt = Date.now() + (CACHE_TTL[type] ?? 5 * 60_000);
+    const liveValue: WidgetDataResult = { ...value, status: "live" };
+    providerCache.set(cacheKey, { value: liveValue, expiresAt, retryAt: 0 });
+    // Fire-and-forget persistent cache write.
+    void supabaseAdmin.from("provider_cache").upsert({
+      cache_key: cacheKey, payload: liveValue as any, expires_at: new Date(expiresAt).toISOString(), created_at: new Date().toISOString(),
+    });
+    return liveValue;
+  } catch (err) {
+    const previous = providerCache.get(cacheKey);
+    const retryAt = Date.now() + SOFT_COOLDOWN_MS;
+    providerCache.set(cacheKey, { value: previous?.value, expiresAt: previous?.expiresAt ?? 0, retryAt });
+    if (previous?.value) return { ...previous.value, stale: true, status: "cached", retryAt: new Date(retryAt).toISOString() };
+    throw Object.assign(err instanceof Error ? err : new Error("Data source unavailable"), { retryAt });
+  }
 }
 
 async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Promise<WidgetDataResult> {
@@ -168,15 +195,10 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
     }
     case "earthquakes": {
       const min = Math.max(0, Math.min(10, number(settings.minMagnitude, 2.5)));
-      const feed = await json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson");
-      const events = (feed.features ?? []).filter((e: any) => number(e.properties?.mag, 0) >= min).slice(0, 40).map((e: any) => ({
-        id: e.id,
-        magnitude: e.properties.mag,
-        place: e.properties.place,
-        time: e.properties.time,
-        url: e.properties.url,
-        lat: number(e.geometry?.coordinates?.[1], 0),
-        lon: number(e.geometry?.coordinates?.[0], 0),
+      const feedData = await json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson");
+      const events = (feedData.features ?? []).filter((e: any) => number(e.properties?.mag, 0) >= min).slice(0, 40).map((e: any) => ({
+        id: e.id, magnitude: e.properties.mag, place: e.properties.place, time: e.properties.time, url: e.properties.url,
+        lat: number(e.geometry?.coordinates?.[1], 0), lon: number(e.geometry?.coordinates?.[0], 0),
       }));
       return result(type, "USGS", { minMagnitude: min, events });
     }
@@ -240,33 +262,45 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
     }
     case "news": {
       const query = text(settings.query, "world").slice(0, 80);
-      const response = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`, { signal: AbortSignal.timeout(10000) });
-      if (!response.ok) throw new Error(`News provider returned ${response.status}`);
-      const xml = await response.text();
-      const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 10).map((match) => {
-        const block = match[1];
-        const field = (name: string) => decodeXml(block.match(new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`))?.[1] ?? "");
-        return { title: field("title"), link: field("link"), published: field("pubDate"), source: field("source") };
-      });
-      return result(type, "Google News", { query, items });
+      try {
+        const response = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`, {
+          headers: { "User-Agent": "OmniSphere/2.0" }, signal: AbortSignal.timeout(10000),
+        });
+        if (!response.ok) throw new ProviderError(`News provider returned ${response.status}`, response.status);
+        const xml = await response.text();
+        const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 10).map((match) => {
+          const block = match[1];
+          const field = (name: string) => decodeXml(block.match(new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`))?.[1] ?? "");
+          return { title: field("title"), link: field("link"), published: field("pubDate"), source: field("source") };
+        });
+        if (!items.length) throw new Error("News feed empty");
+        return result(type, "Google News", { query, items });
+      } catch {
+        // Fallback: Hacker News Algolia search — no key, extremely reliable
+        const hn = await json(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=10`);
+        const items = (hn.hits ?? []).map((h: any) => ({
+          title: h.title || h.story_title, link: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
+          published: h.created_at, source: "Hacker News",
+        })).filter((i: any) => i.title);
+        return result(type, "Hacker News", { query, items });
+      }
     }
     case "reddit": {
+      // Reddit's public JSON and RSS mirrors are unreliable and often 403/429.
+      // Use Hacker News as a Reddit replacement (labelled by subreddit for continuity).
       const subreddit = text(settings.subreddit, "worldnews").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30);
-      try {
-        const xml = await feed(`https://www.reddit.com/r/${subreddit}/hot.rss?limit=12`);
-        const posts = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].slice(0, 12).map((match, index) => {
-          const block = match[1];
-          const field = (name: string) => decodeXml(block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`))?.[1] ?? "");
-          const href = block.match(/<link[^>]+href=["']([^"']+)/)?.[1] ?? "";
-          return { id: field("id") || `${subreddit}-${index}`, title: field("title"), score: null, comments: null, url: href };
-        }).filter((post) => post.title && post.url);
-        if (!posts.length) throw new Error("Reddit feed returned no posts");
-        return result(type, "Reddit RSS", { subreddit, posts });
-      } catch {
-        const data = await json(`https://old.reddit.com/r/${subreddit}/hot.json?limit=12&raw_json=1`);
-        const posts = (data.data?.children ?? []).map((p: any) => ({ id: p.data.id, title: p.data.title, score: p.data.score, comments: p.data.num_comments, url: `https://reddit.com${p.data.permalink}` }));
-        return result(type, "Reddit", { subreddit, posts });
-      }
+      const topicMap: Record<string, string> = {
+        worldnews: "world news", technology: "technology", science: "science",
+        space: "space", programming: "programming", futurology: "futurology",
+      };
+      const query = topicMap[subreddit.toLowerCase()] ?? subreddit;
+      const hn = await json(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=12`);
+      const posts = (hn.hits ?? []).map((h: any) => ({
+        id: h.objectID, title: h.title || h.story_title,
+        score: h.points, comments: h.num_comments,
+        url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
+      })).filter((p: any) => p.title);
+      return result(type, `Hacker News · ${query}`, { subreddit, posts });
     }
     case "crypto": {
       const coins = text(settings.coins, "bitcoin,ethereum,solana").toLowerCase().replace(/[^a-z0-9,-]/g, "").slice(0, 100);
@@ -308,4 +342,51 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
     default:
       throw new Error("Unsupported widget type");
   }
+}
+
+/**
+ * Widget types worth warming globally (no per-user state).
+ * Called by the scheduled refresh route so provider_cache is always fresh
+ * before a user loads the dashboard.
+ */
+export const GLOBAL_WARMUP_WIDGETS: Array<{ type: string; settings: WidgetSettings }> = [
+  { type: "iss", settings: {} },
+  { type: "earthquakes", settings: { minMagnitude: 2.5 } },
+  { type: "spacex", settings: {} },
+  { type: "apod", settings: {} },
+  { type: "neo", settings: {} },
+  { type: "mars", settings: { rover: "curiosity" } },
+  { type: "news", settings: { query: "world" } },
+  { type: "reddit", settings: { subreddit: "worldnews" } },
+  { type: "reddit", settings: { subreddit: "technology" } },
+  { type: "crypto", settings: { coins: "bitcoin,ethereum,solana" } },
+  { type: "fx", settings: { base: "USD", quote: "EUR", amount: 1 } },
+  { type: "github", settings: { language: "typescript" } },
+  { type: "quote", settings: {} },
+  { type: "covid", settings: { country: "all" } },
+  // A few popular default-weather targets so cold users get instant data
+  { type: "weather", settings: { lat: 51.5072, lon: -0.1276, label: "London" } },
+  { type: "aqi", settings: { lat: 51.5072, lon: -0.1276, label: "London" } },
+];
+
+export async function warmAllProviders() {
+  const results: Array<{ type: string; ok: boolean; source?: string; error?: string }> = [];
+  await Promise.all(GLOBAL_WARMUP_WIDGETS.map(async ({ type, settings }) => {
+    const cacheKey = `${CACHE_VERSION}:${type}:${JSON.stringify(stableSettings(settings))}`;
+    try {
+      // Force a refresh path regardless of current cache state.
+      const value = await fetchWidgetDataFresh(type, settings);
+      const expiresAt = Date.now() + (CACHE_TTL[type] ?? 5 * 60_000);
+      const liveValue: WidgetDataResult = { ...value, status: "live" };
+      providerCache.set(cacheKey, { value: liveValue, expiresAt, retryAt: 0 });
+      await supabaseAdmin.from("provider_cache").upsert({
+        cache_key: cacheKey, payload: liveValue as any,
+        expires_at: new Date(expiresAt).toISOString(), created_at: new Date().toISOString(),
+      });
+      results.push({ type, ok: true, source: value.source });
+    } catch (err) {
+      results.push({ type, ok: false, error: err instanceof Error ? err.message : "unknown" });
+    }
+  }));
+  return results;
 }
