@@ -41,7 +41,7 @@ function ClientGrid({
   useEffect(() => {
     if (!pending) return;
     const t = setTimeout(() => {
-      onLayoutChange(pending);
+      onLayoutChange(pending as unknown as LayoutItem[]);
       setPending(null);
     }, 500);
     return () => clearTimeout(t);
