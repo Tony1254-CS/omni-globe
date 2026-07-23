@@ -6,8 +6,13 @@ import { toast } from "sonner";
 import { getWidgetData } from "@/lib/widget-data.functions";
 import { DEFAULT_WIDGET_SETTINGS, type WidgetSettings } from "@/lib/widget-data.types";
 import { updateWidgetSettings } from "@/lib/widgets.functions";
+import { scoreWidget } from "@/lib/anomaly";
+import { AttentionBadge } from "@/components/omni/AttentionBadge";
+import { ForecastCard } from "@/components/omni/ForecastCard";
 
 type Props = { id: string; type: string; settings: unknown };
+
+const FORECASTABLE = new Set(["weather", "aqi", "earthquakes", "crypto"]);
 
 const asSettings = (value: unknown): WidgetSettings =>
   value && typeof value === "object" && !Array.isArray(value) ? value as WidgetSettings : {};
