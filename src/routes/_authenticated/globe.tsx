@@ -1,24 +1,36 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Globe2 } from "lucide-react";
+import GlobeInner from "@/components/omni/GlobeInner";
 
 export const Route = createFileRoute("/_authenticated/globe")({
   head: () => ({
     meta: [
       { title: "Globe — OMNISPHERE" },
-      { name: "description", content: "Full-screen live 3D globe view." },
+      { name: "description", content: "Live 3D globe with ISS tracking, earthquake pulses, and your favourite locations." },
+      { property: "og:title", content: "OMNISPHERE Globe — the planet, live" },
+      { property: "og:description", content: "Watch the ISS orbit, earthquakes pulse, and your saved locations on an interactive 3D globe." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: () => (
-    <div className="glass grid min-h-[60vh] place-items-center p-12 text-center">
-      <div>
-        <Globe2 className="mx-auto h-10 w-10 text-primary" />
-        <h1 className="mt-3 text-xl font-semibold">Globe coming in Phase 4</h1>
-        <p className="mt-1 max-w-md text-sm text-muted-foreground">
-          The interactive 3D globe with ISS tracking, earthquake pulses and
-          weather overlays comes online after the data pipeline (Phase 2) and
-          the initial widgets (Phase 3).
-        </p>
-      </div>
+  component: GlobePage,
+  errorComponent: ({ error }) => (
+    <div className="glass p-8 text-center text-sm text-muted-foreground">
+      Globe failed to load: {error.message}
     </div>
   ),
+  notFoundComponent: () => <div className="glass p-8 text-center">Not found</div>,
 });
+
+function GlobePage() {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold">Globe</h1>
+        <p className="text-sm text-muted-foreground">
+          Live view of the planet. Toggle layers on the left, click a point for details.
+        </p>
+      </div>
+      <GlobeInner />
+    </div>
+  );
+}
