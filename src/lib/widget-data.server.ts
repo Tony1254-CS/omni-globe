@@ -74,10 +74,39 @@ function decodeXml(value: string) {
     .trim();
 }
 
+function issPositionFromElements(element: Record<string, unknown>, at = new Date()) {
+  const epoch = new Date(String(element.EPOCH));
+  const meanMotion = number(element.MEAN_MOTION, 15.5);
+  const eccentricity = number(element.ECCENTRICITY, 0.0007);
+  const inclination = number(element.INCLINATION, 51.64) * Math.PI / 180;
+  const ascendingNode = number(element.RA_OF_ASC_NODE, 0) * Math.PI / 180;
+  const argumentOfPerigee = number(element.ARG_OF_PERICENTER, 0) * Math.PI / 180;
+  const elapsedSeconds = (at.getTime() - epoch.getTime()) / 1000;
+  const meanAnomaly = (number(element.MEAN_ANOMALY, 0) * Math.PI / 180 + meanMotion * 2 * Math.PI * elapsedSeconds / 86400) % (2 * Math.PI);
+  let eccentricAnomaly = meanAnomaly;
+  for (let step = 0; step < 7; step += 1) eccentricAnomaly = meanAnomaly + eccentricity * Math.sin(eccentricAnomaly);
+  const semiMajorAxis = Math.cbrt(398600.4418 / (meanMotion * 2 * Math.PI / 86400) ** 2);
+  const orbitalX = semiMajorAxis * (Math.cos(eccentricAnomaly) - eccentricity);
+  const orbitalY = semiMajorAxis * Math.sqrt(1 - eccentricity ** 2) * Math.sin(eccentricAnomaly);
+  const cosO = Math.cos(ascendingNode), sinO = Math.sin(ascendingNode);
+  const cosI = Math.cos(inclination), sinI = Math.sin(inclination);
+  const cosW = Math.cos(argumentOfPerigee), sinW = Math.sin(argumentOfPerigee);
+  const x = (cosO * cosW - sinO * sinW * cosI) * orbitalX + (-cosO * sinW - sinO * cosW * cosI) * orbitalY;
+  const y = (sinO * cosW + cosO * sinW * cosI) * orbitalX + (-sinO * sinW + cosO * cosW * cosI) * orbitalY;
+  const z = sinW * sinI * orbitalX + cosW * sinI * orbitalY;
+  const julianDate = at.getTime() / 86400000 + 2440587.5;
+  const daysSinceJ2000 = julianDate - 2451545;
+  const greenwichAngle = ((280.46061837 + 360.98564736629 * daysSinceJ2000) % 360) * Math.PI / 180;
+  const longitude = Math.atan2(y, x) - greenwichAngle;
+  const wrappedLongitude = ((longitude * 180 / Math.PI + 540) % 360) - 180;
+  const radius = Math.hypot(x, y, z);
+  return { latitude: Math.asin(z / radius) * 180 / Math.PI, longitude: wrappedLongitude, altitude: radius - 6371, velocity: meanMotion * 2 * Math.PI * semiMajorAxis / 24 };
+}
+
 const stableSettings = (settings: WidgetSettings) => Object.fromEntries(Object.entries(settings).sort(([a], [b]) => a.localeCompare(b)));
 
 export async function fetchWidgetData(type: string, settings: WidgetSettings): Promise<WidgetDataResult> {
-  const cacheVersion = type === "iss" ? "v2:" : "";
+  const cacheVersion = type === "iss" ? "v3:" : "";
   const cacheKey = `${cacheVersion}${type}:${JSON.stringify(stableSettings(settings))}`;
   const now = Date.now();
   let cached = providerCache.get(cacheKey);
@@ -157,20 +186,9 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
         const [position, crew] = await Promise.all([json("https://api.wheretheiss.at/v1/satellites/25544"), crewPromise]);
         return result(type, "Where The ISS At", { position, crew });
       } catch {
-        const [tleText, crew] = await Promise.all([feed("https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE"), crewPromise]);
-        const tle = tleText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-        const line1 = tle.find((line) => line.startsWith("1 "));
-        const line2 = tle.find((line) => line.startsWith("2 "));
-        if (!line1 || !line2) throw new Error("ISS orbital elements unavailable");
-        const satellite = await import("satellite.js");
-        const satrec = satellite.twoline2satrec(line1, line2);
-        const now = new Date();
-        const state = satellite.propagate(satrec, now);
-        if (!state || !state.position || typeof state.position === "boolean") throw new Error("ISS orbit calculation unavailable");
-        const gmst = satellite.gstime(now);
-        const geo = satellite.eciToGeodetic(state.position, gmst);
-        const speed = state.velocity && typeof state.velocity !== "boolean" ? Math.hypot(state.velocity.x, state.velocity.y, state.velocity.z) * 3600 : null;
-        return result(type, "CelesTrak orbital model", { position: { latitude: satellite.degreesLat(geo.latitude), longitude: satellite.degreesLong(geo.longitude), altitude: geo.height, velocity: speed }, crew });
+        const [records, crew] = await Promise.all([json("https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=JSON"), crewPromise]);
+        if (!records?.[0]) throw new Error("ISS orbital elements unavailable");
+        return result(type, "CelesTrak orbital model", { position: issPositionFromElements(records[0]), crew });
       }
     }
     case "spacex": {
