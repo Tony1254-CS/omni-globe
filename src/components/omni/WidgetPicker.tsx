@@ -64,7 +64,7 @@ export function WidgetPicker({
               <div>
                 <h2 className="text-lg font-semibold">Add a widget</h2>
                 <p className="text-xs text-muted-foreground">
-                  Pick from live-data widgets. Some come online in later phases.
+                  Pick a live source and customize it after adding.
                 </p>
               </div>
               <button onClick={onClose} className="rounded p-1 hover:bg-secondary">

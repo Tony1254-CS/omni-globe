@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, Trash2, Loader2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -14,8 +14,9 @@ import {
 } from "@/lib/widgets.functions";
 import { WidgetPicker, WIDGET_CATALOG } from "@/components/omni/WidgetPicker";
 import { WidgetShell } from "@/components/omni/WidgetShell";
-import { PlaceholderWidget } from "@/components/omni/PlaceholderWidget";
+import { LiveWidget } from "@/components/omni/LiveWidget";
 import { LayoutGrid } from "@/components/omni/LayoutGrid";
+import { DEFAULT_WIDGET_SETTINGS } from "@/lib/widget-data.types";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -42,7 +43,14 @@ function Dashboard() {
 
   const addMut = useMutation({
     mutationFn: (type: string) =>
-      add({ data: { widget_type: type, x: 0, y: 999, w: 4, h: 4, settings: {} } }),
+      add({ data: {
+        widget_type: type,
+        x: 0,
+        y: widgets.reduce((max, widget) => Math.max(max, widget.y + widget.h), 0),
+        w: 4,
+        h: 4,
+        settings: DEFAULT_WIDGET_SETTINGS[type] ?? {},
+      } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["widgets"] });
       toast.success("Widget added");
@@ -53,6 +61,12 @@ function Dashboard() {
   const delMut = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["widgets"] }),
+  });
+
+  const layoutMut = useMutation({
+    mutationFn: (items: Array<{ id: string; x: number; y: number; w: number; h: number }>) =>
+      save({ data: { items } }),
+    onError: (e: Error) => toast.error(`Layout not saved: ${e.message}`),
   });
 
   const layoutItems = useMemo(
@@ -98,8 +112,8 @@ function Dashboard() {
         >
           <p className="text-lg font-semibold">Your cockpit is empty</p>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            Add your first widget to start monitoring the planet. More live-data
-            widgets are coming online in the next build phase.
+            Add a live widget to start monitoring weather, Earth, space, finance,
+            and global signals.
           </p>
           <button
             onClick={() => setPickerOpen(true)}
@@ -112,25 +126,23 @@ function Dashboard() {
         <LayoutGrid
           items={layoutItems}
           onLayoutChange={(next) => {
-            void save({ data: { items: next.map((n) => ({ id: n.i, x: n.x, y: n.y, w: n.w, h: n.h })) } });
+            layoutMut.mutate(next.map((n) => ({ id: n.i, x: n.x, y: n.y, w: n.w, h: n.h })));
           }}
         >
-          <AnimatePresence>
-            {widgets.map((w) => {
-              const meta = WIDGET_CATALOG.find((c) => c.type === w.widget_type);
-              return (
-                <div key={w.id} data-grid={{ i: w.id, x: w.x, y: w.y, w: w.w, h: w.h }}>
-                  <WidgetShell
-                    title={meta?.label ?? w.widget_type}
-                    onRemove={() => delMut.mutate(w.id)}
-                    removeIcon={<Trash2 className="h-3.5 w-3.5" />}
-                  >
-                    <PlaceholderWidget type={w.widget_type} />
-                  </WidgetShell>
-                </div>
-              );
-            })}
-          </AnimatePresence>
+          {widgets.map((w) => {
+            const meta = WIDGET_CATALOG.find((c) => c.type === w.widget_type);
+            return (
+              <div key={w.id} data-grid={{ i: w.id, x: w.x, y: w.y, w: w.w, h: w.h }}>
+                <WidgetShell
+                  title={meta?.label ?? w.widget_type}
+                  onRemove={() => delMut.mutate(w.id)}
+                  removeIcon={<Trash2 className="h-3.5 w-3.5" />}
+                >
+                  <LiveWidget id={w.id} type={w.widget_type} settings={w.settings} />
+                </WidgetShell>
+              </div>
+            );
+          })}
         </LayoutGrid>
       )}
 

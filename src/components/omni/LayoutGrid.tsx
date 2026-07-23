@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ClientOnly } from "@tanstack/react-router";
 import RGL, {
   WidthProvider,
@@ -38,12 +38,17 @@ function ClientGrid({
   children: ReactNode;
 }) {
   const [pending, setPending] = useState<Layout | null>(null);
+  const lastSaved = useRef("");
   useEffect(() => {
     if (!pending) return;
     const t = setTimeout(() => {
-      onLayoutChange(pending as unknown as LayoutItem[]);
+      const signature = JSON.stringify(pending.map(({ i, x, y, w, h }) => ({ i, x, y, w, h })));
+      if (signature !== lastSaved.current) {
+        lastSaved.current = signature;
+        onLayoutChange(pending as unknown as LayoutItem[]);
+      }
       setPending(null);
-    }, 500);
+    }, 700);
     return () => clearTimeout(t);
   }, [pending, onLayoutChange]);
 

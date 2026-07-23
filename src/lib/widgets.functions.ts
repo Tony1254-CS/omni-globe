@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export const listWidgets = createServerFn({ method: "GET" })
+export const listWidgets = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
@@ -63,6 +63,23 @@ export const saveLayout = createServerFn({ method: "POST" })
       if (error) throw error;
     }
     return { ok: true, count: data.items.length };
+  });
+
+export const updateWidgetSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    id: z.string().uuid(),
+    settings: z.record(z.string().max(60), jsonSchema),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("widget_configs")
+      .update({ settings: data.settings })
+      .eq("id", data.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return row;
   });
 
 export const deleteWidget = createServerFn({ method: "POST" })

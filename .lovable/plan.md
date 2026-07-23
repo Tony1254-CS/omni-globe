@@ -1,191 +1,63 @@
+## Goal
+Make all 17 catalog widgets genuinely useful. No widget will be presented as available unless it loads real data or clearly explains a missing integration.
 
-# OMNISPHERE — Build Plan (Lovable Stack)
+## Confirmed problem
+The dashboard currently routes every widget type to the same `PlaceholderWidget`, so the catalog advertises capabilities that are not implemented. The widget configuration CRUD exists, but the actual widget content layer does not.
 
-## Stack Mapping (Django spec → Lovable equivalents)
+## Implementation plan
 
-| Original | Lovable equivalent |
-|---|---|
-| Django + DRF | TanStack Start route handlers + `createServerFn` |
-| PostgreSQL + PostGIS | Lovable Cloud Postgres (PostGIS extension enabled) |
-| django-allauth (Google/GitHub) | Lovable Cloud Auth (email + Google; GitHub not native — will use Supabase provider) |
-| Django Channels (WebSocket) | Lovable Cloud Realtime (Postgres change streams) |
-| Celery + Celery Beat | `pg_cron` scheduling public API routes under `/api/public/cron/*` |
-| Redis cache | Postgres cached tables with `fetched_at` + TTL |
-| OpenAI (GPT-3.5) | Lovable AI Gateway (Gemini/GPT models) |
-| Docker / Nginx / Gunicorn | Lovable hosting (Cloudflare Workers) |
+1. **Stabilize the dashboard lifecycle**
+   - Validate add, list, delete, drag, resize, and automatic layout persistence.
+   - Replace fire-and-forget layout saves with a debounced mutation that reports failures and avoids overlapping writes.
+   - Add per-widget loading, refresh, stale-data, empty, and retry states so one failed provider never breaks the dashboard.
+   - Ensure new widgets are positioned safely without magic coordinates or validation failures.
 
-The functionality is preserved; only the runtime changes.
+2. **Build a shared live-data architecture**
+   - Add typed server functions and provider adapters; private credentials remain server-side.
+   - Add a backend cache for provider payloads, fetch timestamps, expiry, and error status to control rate limits and keep widgets useful during upstream outages.
+   - Use scheduled refreshes only where needed; allow safe on-demand refreshes with throttling.
+   - Normalize provider errors into user-friendly widget states rather than blank screens or raw exceptions.
 
-## Architecture
+3. **Implement the keyless widgets**
+   - Earthquakes: USGS feed, magnitude/time filters, latest-event list.
+   - ISS Tracker: current coordinates, velocity/altitude where available, last update.
+   - SpaceX: next launch, countdown, mission and launch status.
+   - World Clocks: configurable time zones with live clocks.
+   - Reddit: configurable subreddit and hot-post list using a viable public feed/fallback.
+   - Crypto Ticker: selected assets, prices, 24-hour movement, compact trend display.
+   - Currency: base/quote selection, conversion, current rate.
+   - Country Explorer: search/random country, flag, capital, population, region, map link.
+   - GitHub Trending: trending/popular repositories with language and stars using the best available public source or connected GitHub access.
+   - Quote of the Day: daily cached quote with attribution.
+   - COVID Stats: global/country statistics with source timestamp and graceful handling if the upstream dataset is retired.
 
-```text
-Browser (React + TanStack Router)
-  ├─ 3D Globe (react-globe.gl / three.js)
-  ├─ Draggable grid (react-grid-layout)
-  ├─ Widgets (Framer Motion, shadcn)
-  ├─ Voice (Web Speech API)
-  └─ Realtime subscriptions (Supabase JS)
-        │
-        ▼
-TanStack Server Functions & Routes (Cloudflare Workers)
-  ├─ /api/public/cron/fetch-*      ← pg_cron every 60s
-  ├─ /api/public/cron/daily-brief  ← pg_cron 08:00 per user
-  ├─ /api/public/cron/alerts       ← threshold evaluator
-  ├─ createServerFn: widget CRUD, favourites, alerts, AI query
-  └─ Lovable AI Gateway (briefings, NL→SQL)
-        │
-        ▼
-Lovable Cloud (Postgres + Auth + Realtime + Storage)
-```
+4. **Implement credential-backed widgets**
+   - Weather: location search, current conditions, forecast, unit preference.
+   - Air Quality: AQI category, pollutants, health guidance, selected location.
+   - News: top headlines, country/category/keyword filtering, source links.
+   - Astronomy Picture of the Day: media, title, date, explanation, source link.
+   - Mars Rover: rover/camera/date controls and real photo results.
+   - Near-Earth Objects: upcoming approaches, size, distance, velocity, hazard status.
+   - First check existing project connections and securely stored credentials; only request provider credentials that are actually missing, using the secure secret flow.
 
-## Data Model (Postgres)
+5. **Add widget settings and real rendering**
+   - Replace `PlaceholderWidget` dispatch with a typed widget registry mapping every catalog type to its real component.
+   - Add a settings action to each widget for location, symbols, currencies, time zones, country, subreddit, filters, and refresh preferences as applicable.
+   - Persist settings in each widget’s existing configuration record and validate them server-side.
+   - Show data source and “updated at” information without exposing implementation details.
 
-- `profiles` (id, avatar_url, timezone, units, home_lat, home_lon)
-- `user_roles` (id, user_id, role) + `has_role()` SECURITY DEFINER
-- `favourite_locations` (id, user_id, label, lat, lon)
-- `widget_configs` (id, user_id, widget_type, x, y, w, h, settings jsonb)
-- `user_alerts` (id, user_id, metric, operator, threshold, active, last_fired_at, notify_email, notify_sound)
-- `notifications` (id, user_id, title, body, severity, read_at, created_at)
-- Cached data (public read, service-role write):
-  - `cache_weather` (location_key, lat, lon, payload jsonb, fetched_at)
-  - `cache_aqi`, `cache_earthquakes`, `cache_crypto`, `cache_news`,
-    `cache_iss`, `cache_neo`, `cache_spacex`, `cache_apod`,
-    `cache_mars_photos`, `cache_countries`, `cache_reddit`,
-    `cache_github_trending`, `cache_quote`, `cache_covid`, `cache_fx`
-- Historical time-series:
-  - `hist_weather`, `hist_aqi`, `hist_crypto`, `hist_earthquake`
-    (all with `observed_at timestamptz` + relevant metrics; indexed by time)
-- `daily_briefings` (id, user_id, date, summary, audio_url)
-- `voice_command_log` (id, user_id, transcript, intent, response, created_at)
+6. **Make availability honest**
+   - During implementation, mark unfinished or credential-blocked widgets as unavailable instead of allowing users to add fake widgets.
+   - Once complete, every enabled catalog item must have a real renderer, real data path, useful empty state, and retry behavior.
 
-Every table gets explicit GRANTs and RLS: users read/write only their own rows; cache tables are `TO anon SELECT` (public read) and service-role write from cron.
+7. **Verify end-to-end**
+   - Test all 17 widgets independently and together on the dashboard.
+   - Verify add/remove/settings persistence, refresh, drag/resize persistence, hard reload, provider failure, expired cache, and signed-out behavior.
+   - Check desktop and the current narrow viewport for clipping, overlapping controls, and unreadable widget content.
+   - Confirm route metadata remains complete and run the relevant security/database checks after backend changes.
 
-## Backend Jobs (pg_cron → `/api/public/cron/*`)
-
-Each cron route is signed with a `CRON_SECRET` header check.
-
-- `fetch-weather` every 10 min for all favourite locations + top cities
-- `fetch-aqi` every 15 min
-- `fetch-earthquakes` every 5 min (USGS)
-- `fetch-iss` every 30 sec (Open Notify) + realtime broadcast
-- `fetch-crypto` every 60 sec (CoinGecko top 50)
-- `fetch-fx` daily (ExchangeRate-API)
-- `fetch-news` every 15 min (NewsAPI)
-- `fetch-apod` daily (NASA)
-- `fetch-mars-photos` daily
-- `fetch-neo` daily
-- `fetch-spacex` hourly
-- `fetch-reddit` every 10 min per tracked subreddit
-- `fetch-github-trending` hourly
-- `fetch-quote` daily
-- `fetch-covid` hourly
-- `evaluate-alerts` every 60 sec → inserts `notifications`, sends email via connector
-- `daily-briefing` hourly (checks each user's 08:00 in their timezone)
-
-Each fetch writes to `cache_*` (upsert) and appends to `hist_*` when applicable.
-
-## Frontend Routes
-
-- `/` — public landing with sign-in CTA
-- `/auth` — Lovable-managed auth gate
-- `/_authenticated/dashboard` — main cockpit (globe + widget grid)
-- `/_authenticated/globe` — full-screen globe mode ("Zen")
-- `/_authenticated/history` — analytics + time-machine slider
-- `/_authenticated/alerts` — manage thresholds
-- `/_authenticated/settings` — profile, timezone, units, favourites
-- `/_authenticated/briefings` — past AI briefings
-
-Keyboard shortcut `⌘K` opens a command palette (cmdk).
-
-## Widgets (20+)
-
-Weather · Forecast · AQI · Earthquakes · APOD · Mars Rover · NEO · SpaceX · ISS crew & passes · World clocks · News · Reddit · Crypto ticker · FX converter · Countries explorer · GitHub trending · Quote · COVID · Notifications · Voice log · AI chat.
-
-Each widget = a React component fed by `useSuspenseQuery` against a `createServerFn` reading `cache_*`. Realtime subscription updates the query cache. Draggable/resizable via `react-grid-layout`; layout persisted to `widget_configs`.
-
-## 3D Globe
-
-- `react-globe.gl` with day/night texture
-- Layers toggled from a control bar:
-  - ISS marker (updates via realtime channel)
-  - Earthquake markers (size = magnitude, pulse animation)
-  - Weather tile overlay (OpenWeatherMap tile URL template)
-  - Click anywhere → spawn weather+AQI widget for that lat/lon
-- Rendered client-only (dynamic import behind `<ClientOnly>`) — Three.js is browser-only.
-
-## AI Voice Assistant
-
-- Web Speech API for wake word "Omni" and STT
-- `createServerFn: aiVoiceQuery` → Lovable AI Gateway with tool definitions:
-  - `show_widget(type, params)`, `get_weather(city)`, `get_earthquakes(min_mag)`,
-    `add_alert(metric, op, threshold)`, `summarize_news()`, `query_history(sql_intent)`
-- NL→SQL restricted to a whitelisted read-only view set
-- Response spoken via Web Speech `speechSynthesis`
-- Daily 08:00 briefing generated server-side, stored in `daily_briefings`,
-  optional TTS audio via Lovable AI TTS uploaded to storage
-
-## Alerts
-
-- `evaluate-alerts` cron reads active `user_alerts`, compares to latest `cache_*`
-- On fire: insert `notifications` row (triggers realtime bell badge),
-  send email via a mail connector (Resend), optional chime client-side
-
-## Historical Data & Time Machine
-
-- History pages use Recharts against `hist_*` tables
-- Time-machine: date slider on `/history` — server function returns snapshots
-  from `hist_*` for the selected timestamp; widgets re-render in read-only mode
-- CSV export via server function → `text/csv` response
-- PDF export via `@react-pdf/renderer` on the client
-
-## Design System
-
-- Dark-first neon glassmorphism theme in `src/styles.css`
-- oklch semantic tokens: `--neon-cyan`, `--neon-magenta`, `--glass-bg`,
-  `--glass-border`, gradients + glow shadows
-- Framer Motion for panel transitions, hover glows, widget spawn animations
-- Fully responsive: grid collapses to single column on mobile; globe becomes
-  a compact preview with tap-to-expand
-- Light theme toggle via `.dark` variant class
-
-## Secrets Required
-
-Please have ready to paste into `add_secret` when we reach each phase:
-`OPENWEATHERMAP_API_KEY`, `AQICN_TOKEN`, `NEWSAPI_KEY`, `NASA_API_KEY`,
-`THEYSAIDSO_KEY`, `RESEND_API_KEY` (for email alerts), and confirm Google OAuth
-setup in Lovable Cloud auth settings. `LOVABLE_API_KEY` and `CRON_SECRET`
-will be auto-provisioned. Keyless APIs (USGS, SpaceX, CoinGecko, ISS, Reddit,
-REST Countries, GitHub, disease.sh, ExchangeRate-API free tier) need nothing.
-
-## Build Phases (each phase is a separate turn / delivery)
-
-1. **Foundation** — Enable Cloud, auth (email + Google), profiles, RLS, roles,
-   design system tokens, app shell, landing page, authenticated layout,
-   dashboard skeleton with draggable empty grid, favourites CRUD, settings page.
-2. **Cached data pipeline** — Cache & history tables, cron routes for all
-   keyless APIs (USGS, ISS, SpaceX, CoinGecko, Reddit, REST Countries, GitHub,
-   ExchangeRate, disease.sh), pg_cron schedules, realtime channels.
-3. **Widgets v1** — 10 widgets bound to phase-2 caches, `react-grid-layout`
-   persistence, widget picker, per-widget settings.
-4. **3D Globe** — react-globe.gl integration, ISS + earthquake layers,
-   click-to-spawn widget, layer controls, Zen mode route.
-5. **Keyed APIs** — add OpenWeatherMap, AQICN, NewsAPI, NASA (APOD/Mars/NEO),
-   TheySaidSo; remaining 10+ widgets; weather-tile overlay on globe.
-6. **AI voice assistant** — Web Speech wake word + STT, tool-calling server fn
-   via Lovable AI Gateway, TTS response, command palette (`⌘K`).
-7. **Alerts + notifications** — alert CRUD UI, evaluator cron, notification
-   bell + realtime badge, Resend email integration, chime.
-8. **History & time machine** — Recharts pages, date slider, CSV/PDF export.
-9. **Daily briefings** — 08:00 cron per-user-timezone, briefing storage, TTS
-   audio, `/briefings` page.
-10. **Polish** — animations pass, keyboard shortcuts, social share, PWA
-    manifest, onboarding tour, i18n (en/es), Zen mode audio, SEO metadata per route.
-
-Each phase ends buildable and testable. Approving this plan starts Phase 1.
-
-## Non-goals / deviations from original spec
-
-- No Django, Celery, Redis, Docker, Nginx, Gunicorn (Lovable stack replaces them).
-- GitHub OAuth login: not natively supported on Lovable Cloud. Google login ships in Phase 1; GitHub login can be added later by switching to the Supabase integration if you need it.
-- "PostGIS queries" from globe are done client-side against cached GeoJSON;
-  PostGIS extension is enabled but only used for indexed nearest-favourite lookups.
+## Technical boundaries
+- App-internal data access will use authenticated TanStack server functions.
+- Scheduled external refreshes will use secured public server routes plus backend scheduling, not browser polling.
+- User-owned settings remain protected by row-level access rules; shared cached provider data exposes only safe public payloads.
+- API keys will never be stored in frontend code or widget settings.
