@@ -17,8 +17,8 @@ export type WidgetDataResult = {
 };
 
 export const DEFAULT_WIDGET_SETTINGS: Record<string, WidgetSettings> = {
-  weather: { lat: 51.5072, lon: -0.1276, label: "London" },
-  aqi: { lat: 51.5072, lon: -0.1276, label: "London" },
+  weather: { useGlobalLocation: true },
+  aqi: { useGlobalLocation: true },
   earthquakes: { minMagnitude: 2.5 },
   iss: {},
   spacex: {},

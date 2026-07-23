@@ -23,6 +23,10 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
     meta: [
       { title: "Dashboard — OMNISPHERE" },
       { name: "description", content: "Your personal real-time command center." },
+      { property: "og:title", content: "Dashboard — OMNISPHERE" },
+      { property: "og:description", content: "Your personal real-time global awareness command center." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Dashboard,
@@ -77,24 +81,24 @@ function Dashboard() {
         y: w.y,
         w: w.w,
         h: w.h,
-        minW: 3,
-        minH: 3,
+        minW: 2,
+        minH: 2,
       })),
     [widgets],
   );
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <h1 className="font-display text-3xl font-semibold">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
             Drag, resize, arrange. Your layout is saved automatically.
           </p>
         </div>
         <button
           onClick={() => setPickerOpen(true)}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:brightness-110"
+          className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-premium transition duration-200 hover:-translate-y-0.5 hover:brightness-105"
         >
           <Plus className="h-4 w-4" /> Add widget
         </button>

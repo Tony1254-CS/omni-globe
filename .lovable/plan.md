@@ -1,46 +1,39 @@
+# OMNISPHERE reliability and premium redesign
 
-# Plan — Shell polish + feature audit
+## 1. Fix the broken functionality first
+- Repair the globe initialization so missing or delayed orbit controls cannot crash the page; make initialization, resize, cleanup, auto-rotate, texture loading, and data-layer failures defensive.
+- Move the earthquake globe feed behind the existing authenticated server data path instead of relying on a browser-side third-party request.
+- Audit every widget provider and renderer together, including returned `error` payloads, empty/changed response shapes, provider rate limits, invalid user settings, image failures, and unsupported data.
+- Show explicit retryable source errors instead of presenting failed responses as “No current data.”
+- Add resilient fallbacks/caching where public APIs are unreliable, and verify all 17 catalog widgets individually.
 
-## 1. Sidebar: collapse by default, expand on hover
+## 2. Make widget resizing genuinely usable
+- Replace the nearly invisible southeast-only resize affordance with clear custom edge/corner handles that appear on hover/focus and work from supported directions.
+- Relax the current restrictive minimum dimensions per widget while enforcing sensible type-specific minimums so content remains usable.
+- Keep drag limited to the widget header, prevent settings/buttons from initiating drag, and persist width/height after resize.
+- Add a short resize-state treatment—focused border, live dimensions, smooth settle animation—and support keyboard-accessible preset sizes where practical.
+- Verify move, resize, reload persistence, compacting, and narrow-screen behavior.
 
-Rework `src/components/omni/AppShell.tsx`:
-- Sidebar stays fixed on the left but at `w-16` (icon‑only) by default and expands to `w-60` on `hover`/`focus-within` using a CSS transition (`group` + `group-hover:w-60`).
-- Labels fade in only when expanded; icons always visible. Active route still highlighted.
-- Push main content with a matching left margin (`ml-16`) so the expanded panel floats over content without reflowing (prevents jumpy layout).
-- Mobile bottom nav stays as‑is.
+## 3. Add global and per-widget location controls
+- Add a searchable city/location picker using a keyless geocoding source; selecting a result stores label, latitude, longitude, and timezone.
+- Add a global default location in Settings and expose the current location in the command bar.
+- Weather and Air Quality widgets inherit the global location by default and can opt into a per-widget override from their settings.
+- Reuse the saved global location for other location-aware experiences and keep manual coordinates as an advanced fallback, not the primary UX.
 
-## 2. Light / Dark mode
+## 4. Build the selected Premium Apple Glass direction
+- Implement the chosen “Premium Apple Glass” composition using the locked Obsidian Glass palette: `#08090B`, `#17191D`, `#E8EDF2`, `#36C5F0`.
+- Load Sora for headings and Manrope for interface/body text.
+- Preserve the left 64px navigation rail and its hover/focus expansion, but rebuild it with polished smoked-glass depth, precise icon alignment, stronger active states, and scroll-safe navigation.
+- Recompose the dashboard as a coherent bento control room rather than the current sparse staggered columns, while preserving users’ draggable saved layouts.
+- Replace the current neon/radial-heavy treatment with restrained translucent surfaces, fine keylines, inner highlights, layered shadows, and disciplined cyan status accents in both dark and light themes.
+- Keep card radii controlled and avoid decorative orbs, purple gradients, nested-card clutter, and hardcoded component colors.
 
-- Add `ThemeProvider` (`src/components/theme-provider.tsx`) that toggles the `dark` class on `<html>` and persists to `localStorage` (`omnisphere-theme`), reading it inside `useEffect` to avoid SSR hydration mismatch. Default = dark.
-- Add `ThemeToggle` button (sun/moon icon) in the `AppShell` header.
-- Extend `src/styles.css`: the current `:root` tokens become the dark palette (already dark‑first). Add a light palette under `:root:not(.dark)` (or move dark tokens under `.dark`) — light background near `oklch(0.98 0.005 250)`, dark foreground, softer glass, muted neon accents. Keep neon tokens identical so brand stays consistent.
-- Wrap the app in `ThemeProvider` in `src/routes/__root.tsx`.
+## 5. Add premium motion without hurting usability
+- Add subtle spring sidebar expansion, staged dashboard entrance, glass hover refraction, widget lift/focus, resize feedback, and smooth bento settling.
+- Keep motion short and functional; disable nonessential effects under `prefers-reduced-motion`.
+- Stabilize the UTC clock/client-rendered values to avoid hydration mismatches.
 
-## 3. Widget resizing
-
-`src/components/omni/LayoutGrid.tsx` currently omits `isResizable`, so RGL default (true) applies but no resize handle CSS is guaranteed and `WidgetShell` overflow may clip it. Fix:
-- Pass `isResizable`, `resizeHandles: ['se']`, and ensure `react-resizable/css/styles.css` is already imported (it is).
-- In `src/components/omni/WidgetShell.tsx`, drop `overflow-hidden` on the outer container (keep inner scroll) so the SE handle isn't clipped; add a subtle styled handle (`.react-resizable-handle` override in `styles.css`) matching the neon theme.
-- Ensure `saveLayout` already persists `w`/`h` (it does).
-
-## 4. Feature audit — what's actually done vs missing
-
-From `.lovable/plan.md` (Layers 2–8) and current tree:
-
-Done and wired:
-- Layer 1 Predictive Intelligence (anomaly badges, forecasts, briefing).
-- Layer 2 Automations (table + cron hook + `/automations`).
-- Layer 3 Collaboration — `shared_dashboards` + `/shares` + `/s/$slug` public view. Workspaces/members NOT built.
-- Layer 4 Custom Agents (`/agents`, tool‑calling).
-- Layer 5 IoT demo (`/devices`, HMAC ingest). Missing: `iot_device` widget type in `widget-data.server.ts` / `LiveWidget`.
-- Layer 6 Vertical presets (`/presets`).
-- Layer 7 Gamification (`/achievements`). Missing: unlock toast + header streak counter.
-- Layer 8 Infra polish: tables exist (`provider_cache`, `client_errors`), but `widget-data.server.ts` does NOT yet use `provider_cache` or a rate‑limit token bucket. No global error boundary logging into `client_errors`. `LiveWidget` not memoised, history charts not virtualised.
-
-This turn implements only 1–3 above (UI/shell scope). The audit in section 4 is reported so you can pick the next batch — I won't start those without your say‑so.
-
-## Technical notes
-
-- Theme class on `<html>`: apply pre‑hydration via a tiny inline script in `__root.tsx` head to avoid a flash of dark on light preference.
-- Sidebar hover: pure CSS (`group` + `peer` + transitions), no JS state — keeps SSR stable.
-- Resize handle styling lives as an `@utility` or plain selector in `styles.css` so it themes with tokens.
+## 6. Validate the complete experience
+- Run targeted checks for globe initialization, each widget’s successful and failed states, settings persistence, global/per-widget location inheritance, theme persistence, and resize persistence.
+- Use browser-driven desktop and mobile verification to confirm no sidebar overlap, clipped text, blank WebGL canvas, unusable controls, or widget collisions.
+- Confirm all content routes retain unique metadata and report any larger unfinished product features separately from this repair/redesign scope.

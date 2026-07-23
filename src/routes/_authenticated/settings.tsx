@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { Loader2, MapPin, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { LocationSearch } from "@/components/omni/LocationSearch";
 
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
 import {
@@ -17,6 +18,10 @@ export const Route = createFileRoute("/_authenticated/settings")({
     meta: [
       { title: "Settings — OMNISPHERE" },
       { name: "description", content: "Profile, units and favourite locations." },
+      { property: "og:title", content: "Settings — OMNISPHERE" },
+      { property: "og:description", content: "Manage profile, units and global location preferences." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: SettingsPage,
@@ -42,17 +47,19 @@ function SettingsPage() {
   const [displayName, setDisplayName] = useState("");
   const [timezone, setTimezone] = useState("UTC");
   const [units, setUnits] = useState<"metric" | "imperial">("metric");
+  const [home, setHome] = useState<{ label: string; lat: number; lon: number } | null>(null);
 
   useEffect(() => {
     if (!profile) return;
     setDisplayName(profile.display_name ?? "");
     setTimezone(profile.timezone ?? "UTC");
     setUnits((profile.units as "metric" | "imperial") ?? "metric");
+    if (profile.home_lat != null && profile.home_lon != null) setHome({ label: profile.home_label ?? "Home", lat: profile.home_lat, lon: profile.home_lon });
   }, [profile]);
 
   const saveMut = useMutation({
     mutationFn: () =>
-      saveProfile({ data: { display_name: displayName, timezone, units } }),
+      saveProfile({ data: { display_name: displayName, timezone, units, home_label: home?.label ?? null, home_lat: home?.lat ?? null, home_lon: home?.lon ?? null } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile"] });
       toast.success("Profile saved");
@@ -126,6 +133,12 @@ function SettingsPage() {
               <option value="imperial">Imperial (°F, mi)</option>
             </select>
           </div>
+        </div>
+        <div className="mt-4 max-w-xl">
+          <label className="text-xs font-medium">Global location</label>
+          <p className="mb-2 text-xs text-muted-foreground">Weather and air-quality widgets use this by default.</p>
+          <LocationSearch onSelect={(location) => { setHome({ label: location.label, lat: location.lat, lon: location.lon }); setTimezone(location.timezone); }} />
+          {home && <div className="mt-2 flex items-center gap-2 rounded-md bg-secondary/60 p-2 text-xs"><MapPin className="h-4 w-4 text-primary" /><span className="font-medium">{home.label}</span><span className="text-muted-foreground">{home.lat.toFixed(2)}, {home.lon.toFixed(2)}</span></div>}
         </div>
         <div className="mt-4">
           <button

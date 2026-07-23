@@ -13,7 +13,7 @@ export function WidgetShell({
   children: ReactNode;
 }) {
   return (
-    <div className="glass relative flex h-full flex-col">
+    <div className="glass widget-surface relative flex h-full flex-col">
       <div className="widget-handle flex cursor-grab items-center justify-between border-b border-glass-border px-3 py-2 active:cursor-grabbing">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           <GripVertical className="h-3.5 w-3.5" />
@@ -29,7 +29,7 @@ export function WidgetShell({
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-auto p-3">{children}</div>
+      <div className="flex-1 overflow-auto p-4">{children}</div>
     </div>
   );
 }

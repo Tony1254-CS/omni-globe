@@ -17,6 +17,15 @@ async function json(url: string) {
   return response.json() as Promise<any>;
 }
 
+async function jsonWithFallback(primary: string, fallback?: string) {
+  try {
+    return await json(primary);
+  } catch (error) {
+    if (!fallback) throw error;
+    return json(fallback);
+  }
+}
+
 const result = (type: string, source: string, data: WidgetDataValue): WidgetDataResult => ({
   type,
   source,
@@ -50,7 +59,15 @@ export async function fetchWidgetData(type: string, settings: WidgetSettings): P
     case "earthquakes": {
       const min = Math.max(0, Math.min(10, number(settings.minMagnitude, 2.5)));
       const feed = await json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson");
-      const events = (feed.features ?? []).filter((e: any) => number(e.properties?.mag, 0) >= min).slice(0, 12).map((e: any) => ({ id: e.id, magnitude: e.properties.mag, place: e.properties.place, time: e.properties.time, url: e.properties.url }));
+      const events = (feed.features ?? []).filter((e: any) => number(e.properties?.mag, 0) >= min).slice(0, 40).map((e: any) => ({
+        id: e.id,
+        magnitude: e.properties.mag,
+        place: e.properties.place,
+        time: e.properties.time,
+        url: e.properties.url,
+        lat: number(e.geometry?.coordinates?.[1], 0),
+        lon: number(e.geometry?.coordinates?.[0], 0),
+      }));
       return result(type, "USGS", { minMagnitude: min, events });
     }
     case "iss": {
@@ -61,7 +78,7 @@ export async function fetchWidgetData(type: string, settings: WidgetSettings): P
       return result(type, "Where The ISS At", { position, crew });
     }
     case "spacex": {
-      const data = await json("https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=10");
+      const data = await jsonWithFallback("https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=10", "https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=3");
       const next = (data.results ?? []).find((launch: any) => /spacex/i.test(`${launch.launch_service_provider?.name ?? ""} ${launch.name ?? ""}`)) ?? data.results?.[0];
       return result(type, "Launch Library 2", next ?? null);
     }
@@ -100,13 +117,18 @@ export async function fetchWidgetData(type: string, settings: WidgetSettings): P
     }
     case "reddit": {
       const subreddit = text(settings.subreddit, "worldnews").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30);
-      const data = await json(`https://www.reddit.com/r/${subreddit}/hot.json?limit=12&raw_json=1`);
+      const data = await jsonWithFallback(`https://www.reddit.com/r/${subreddit}/hot.json?limit=12&raw_json=1`, `https://www.reddit.com/r/${subreddit}/new.json?limit=12&raw_json=1`);
       const posts = (data.data?.children ?? []).map((p: any) => ({ id: p.data.id, title: p.data.title, score: p.data.score, comments: p.data.num_comments, url: `https://reddit.com${p.data.permalink}` }));
       return result(type, "Reddit", { subreddit, posts });
     }
     case "crypto": {
       const coins = text(settings.coins, "bitcoin,ethereum,solana").toLowerCase().replace(/[^a-z0-9,-]/g, "").slice(0, 100);
-      const data = await json(`https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coins)}&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true`);
+      const data = await jsonWithFallback(`https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coins)}&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true`, `https://api.coincap.io/v2/assets?limit=10`);
+      if (data?.data && Array.isArray(data.data)) {
+        const requested = new Set(coins.split(","));
+        const normalized = Object.fromEntries(data.data.filter((coin: any) => requested.has(coin.id)).map((coin: any) => [coin.id, { usd: Number(coin.priceUsd), usd_24h_change: Number(coin.changePercent24Hr) }]));
+        return result(type, "CoinCap", normalized);
+      }
       return result(type, "CoinGecko", data);
     }
     case "fx": {
