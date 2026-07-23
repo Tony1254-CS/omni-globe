@@ -4,9 +4,13 @@
 // Every AI call site (briefing, oracle, pulse, foresight, agents, timemachine)
 // goes through this helper so switching providers is a single env-var change.
 
+export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
 type ChatOptions = {
-  system: string;
-  user: string;
+  /** Either provide system+user, OR provide messages directly. */
+  system?: string;
+  user?: string;
+  messages?: ChatMessage[];
   jsonMode?: boolean;
   timeoutMs?: number;
   /** Lovable model id (e.g. "google/gemini-3.6-flash"). Mapped to Gemini native id when using direct key. */
