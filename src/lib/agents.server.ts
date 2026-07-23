@@ -114,8 +114,17 @@ export async function executeAgent(
   userId: string,
   supabase: SupabaseLike,
 ): Promise<{ output: string; steps: Step[]; status: "ok" | "error" }> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) return { output: "AI unavailable (no LOVABLE_API_KEY)", steps: [], status: "error" };
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  if (!geminiKey && !lovableKey) return { output: "AI unavailable (no GEMINI_API_KEY or LOVABLE_API_KEY)", steps: [], status: "error" };
+
+  const url = geminiKey
+    ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    : "https://ai.gateway.lovable.dev/v1/chat/completions";
+  const authKey = geminiKey ?? lovableKey!;
+  const modelId = geminiKey
+    ? "gemini-2.0-flash"
+    : (agent.model || "google/gemini-3.6-flash");
 
   const tools = TOOL_DEFS.filter((t) => agent.tools.includes(t.function.name));
   const messages: Array<Record<string, unknown>> = [
@@ -125,14 +134,14 @@ export async function executeAgent(
   const steps: Step[] = [];
 
   for (let i = 0; i < 6; i++) {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
+        Authorization: `Bearer ${authKey}`,
       },
       body: JSON.stringify({
-        model: agent.model || "google/gemini-3.6-flash",
+        model: modelId,
         messages,
         tools: tools.length > 0 ? tools : undefined,
         tool_choice: tools.length > 0 ? "auto" : undefined,
