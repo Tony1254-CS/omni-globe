@@ -118,7 +118,12 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
         </div>
       )}
 
-      {query.data?.data && !editing && <div className="mt-2 flex shrink-0 justify-between border-t border-glass-border pt-2 text-[10px] text-muted-foreground"><span>{query.data.stale ? "Cached · " : ""}{query.data.source}</span><span>{new Date(query.data.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>}
+      {query.data?.data && !editing && (
+        <div className="mt-2 flex shrink-0 items-center justify-between gap-2 border-t border-glass-border pt-2">
+          <TrustBadge source={query.data.source} updatedAt={query.data.updatedAt} level={query.data.stale ? "cached" : "verified"} />
+          <span className="text-[10px] text-muted-foreground">{new Date(query.data.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        </div>
+      )}
     </div>
   );
 }
