@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Globe2, LayoutDashboard, Settings, Radar, LogOut, Bell, Sparkles, Zap, Bot, Cpu, Trophy, Share2, Sun, Moon, MapPin } from "lucide-react";
+import { Globe2, LayoutDashboard, Settings, Radar, LogOut, Bell, Sparkles, Zap, Bot, Cpu, Trophy, Share2, Sun, Moon, MapPin, Brain } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 

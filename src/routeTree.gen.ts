@@ -16,6 +16,7 @@ import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as AuthenticatedSharesRouteImport } from './routes/_authenticated/shares'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedPresetsRouteImport } from './routes/_authenticated/presets'
+import { Route as AuthenticatedOracleRouteImport } from './routes/_authenticated/oracle'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedGlobeRouteImport } from './routes/_authenticated/globe'
 import { Route as AuthenticatedDevicesRouteImport } from './routes/_authenticated/devices'
@@ -60,6 +61,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
 const AuthenticatedPresetsRoute = AuthenticatedPresetsRouteImport.update({
   id: '/presets',
   path: '/presets',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOracleRoute = AuthenticatedOracleRouteImport.update({
+  id: '/oracle',
+  path: '/oracle',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/devices': typeof AuthenticatedDevicesRoute
   '/globe': typeof AuthenticatedGlobeRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/oracle': typeof AuthenticatedOracleRoute
   '/presets': typeof AuthenticatedPresetsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shares': typeof AuthenticatedSharesRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/devices': typeof AuthenticatedDevicesRoute
   '/globe': typeof AuthenticatedGlobeRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/oracle': typeof AuthenticatedOracleRoute
   '/presets': typeof AuthenticatedPresetsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shares': typeof AuthenticatedSharesRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/_authenticated/devices': typeof AuthenticatedDevicesRoute
   '/_authenticated/globe': typeof AuthenticatedGlobeRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
+  '/_authenticated/oracle': typeof AuthenticatedOracleRoute
   '/_authenticated/presets': typeof AuthenticatedPresetsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/shares': typeof AuthenticatedSharesRoute
@@ -195,6 +204,7 @@ export interface FileRouteTypes {
     | '/devices'
     | '/globe'
     | '/history'
+    | '/oracle'
     | '/presets'
     | '/settings'
     | '/shares'
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/devices'
     | '/globe'
     | '/history'
+    | '/oracle'
     | '/presets'
     | '/settings'
     | '/shares'
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/_authenticated/devices'
     | '/_authenticated/globe'
     | '/_authenticated/history'
+    | '/_authenticated/oracle'
     | '/_authenticated/presets'
     | '/_authenticated/settings'
     | '/_authenticated/shares'
@@ -300,6 +312,13 @@ declare module '@tanstack/react-router' {
       path: '/presets'
       fullPath: '/presets'
       preLoaderRoute: typeof AuthenticatedPresetsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/oracle': {
+      id: '/_authenticated/oracle'
+      path: '/oracle'
+      fullPath: '/oracle'
+      preLoaderRoute: typeof AuthenticatedOracleRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/history': {
@@ -392,6 +411,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDevicesRoute: typeof AuthenticatedDevicesRoute
   AuthenticatedGlobeRoute: typeof AuthenticatedGlobeRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
+  AuthenticatedOracleRoute: typeof AuthenticatedOracleRoute
   AuthenticatedPresetsRoute: typeof AuthenticatedPresetsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSharesRoute: typeof AuthenticatedSharesRoute
@@ -407,6 +427,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDevicesRoute: AuthenticatedDevicesRoute,
   AuthenticatedGlobeRoute: AuthenticatedGlobeRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
+  AuthenticatedOracleRoute: AuthenticatedOracleRoute,
   AuthenticatedPresetsRoute: AuthenticatedPresetsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSharesRoute: AuthenticatedSharesRoute,
