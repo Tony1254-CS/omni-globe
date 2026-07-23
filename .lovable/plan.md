@@ -1,65 +1,61 @@
-# OMNISPHERE audit — what's broken and the fix plan
 
-I traced the widget data path (`src/lib/widget-data.server.ts`, `src/components/omni/LiveWidget.tsx`), profile/location flow (`src/lib/profile.functions.ts`, `src/routes/_authenticated/settings.tsx`) and the clocks/AQI rendering. Below is what is actually broken, followed by the exact fixes.
+# Premium Polish Pass
 
-## Findings
+Goal: keep the current clean UI, but make it feel Apple-grade — instant, fluid, tactile, and correct on every screen size. No feature changes, no backend changes.
 
-### 1. AQI widget
-- **Silent zero when `us_aqi` is null.** `current.us_aqi` from Open-Meteo returns `null` for a lot of non-US regions. Renderer does `Number(data.current?.us_aqi ?? 0)` → shows a big "0 / Good" instead of a real reading.
-- **Cache-validator rejects valid rows.** `isFinite(Number(null ?? null))` → `false`, so a successful response with only European AQI + pollutants is thrown away and the provider is re-hit until it 429s.
-- **No European AQI fallback.** Open-Meteo exposes `european_aqi` that is populated everywhere in EU/UK; we never request it.
-- **Pollutant tiles show unit-less numbers** (PM2.5 "7.8" with no µg/m³).
-- **Fallback branch keeps hourly values but drops `us_aqi` band-labelling** — same null issue cascades.
+## 1. Motion system (snappy + smooth)
 
-### 2. Timezone / clocks
-- **Clocks are frozen.** Server returns `now: Date.now()` (cached ≥1 s, client `staleTime: 5 min`, no `refetchInterval`). The card renders that one timestamp — seconds never tick.
-- **Global location's timezone is ignored.** `profiles.timezone` is stored (Settings saves it, LocationSearch fills it in) but no widget reads it. Clocks widget only takes a hand-typed comma list.
-- **`date()` helper uses browser TZ**, not the profile TZ, so timestamps on quake/space/news cards disagree with the user's selected location.
+- Add a shared motion token set in `src/styles.css`:
+  - `--ease-out-quint: cubic-bezier(.22,1,.36,1)`
+  - `--ease-spring: cubic-bezier(.34,1.56,.64,1)`
+  - `--dur-fast: 140ms`, `--dur-base: 220ms`, `--dur-slow: 420ms`
+- Standardize every transition on these tokens (sidebar, widgets, buttons, dialogs, tabs, popovers).
+- Replace long 480–900ms transitions on `.widget-surface` and `.glass-specular` with `--dur-base`/`--dur-slow` so hover feels instant, not draggy.
+- Add `will-change: transform` only on hover-lifted elements; remove after transition to keep GPU layers cheap.
+- Respect `prefers-reduced-motion` (already partially handled — extend to new tokens).
 
-### 3. Global-location propagation
-- Only `weather` and `aqi` honour `useGlobalLocation` + `profile.home_*`. `clocks`, `news`, `covid` (defaults to hard-coded country), `countries`, `mars` do not — users expect "change global location" to move local news/AQI/clock all at once.
-- Settings' LocationSearch updates state but the "Save profile" button is required; nothing tells the user that. Fine, but the widgets' per-card LocationSearch writes `timezone` into widget settings that is then unused.
+## 2. Snappiness (perceived speed)
 
-### 4. Units
-- Weather widget always renders °C / km·h⁻¹ regardless of `profile.units = imperial`.
-- AQI/quake magnitude renderers ignore units too (magnitude is unitless, OK, but wind/temperature aren't).
+- Enable route preloading: `defaultPreload: "intent"` in `src/router.tsx` (currently only `defaultPreloadStaleTime: 0`) so hovering a sidebar link warms the route + loader.
+- Add optimistic hover state to sidebar links and widget cards (translate + shadow within 120ms).
+- Add `content-visibility: auto` + `contain-intrinsic-size` to off-screen widget cards for faster scroll/paint on the dashboard.
+- Debounce grid layout persistence in `LayoutGrid` (already immediate) → coalesce to 250ms so drag/resize doesn't jank on network writes.
+- Add skeleton shimmer that matches final layout dimensions (prevents layout shift when `LiveWidget` resolves).
 
-### 5. Minor
-- `WIDGET_STATES` has no entry for `clocks`, `quote`, `covid` → falls back to generic "Live source unavailable" copy.
-- `refetchInterval` is only set for `iss`; other real-time-ish widgets (crypto, fx, clocks) never auto-refresh in the tab.
+## 3. Micro-interactions (tactile)
 
-## Fix plan (scoped, no unrelated changes)
+- Buttons: unify `.liquid-control` + `.primary-glass-button` press feedback (scale 0.97, 120ms) and add subtle inner highlight on active.
+- Sidebar: icon springs (scale 1.0 → 1.08) on hover with `--ease-spring`; active rail indicator animates height/position instead of hard-swapping.
+- Widget cards: hover lift capped at `translateY(-2px)` (currently -3px feels floaty at small sizes); add specular sheen sweep only on pointer:fine devices.
+- Tabs / dialogs / popovers: use `animate-in fade-in-0 zoom-in-95` from `tw-animate-css` consistently.
+- Focus rings: crisp 2px `--ring` with 2px offset, visible only on `:focus-visible`.
 
-**A. AQI correctness**
-1. `widget-data.server.ts` › `case "aqi"`: request both `us_aqi,european_aqi,pm10,pm2_5,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide`. In the response, compute `primary_aqi = us_aqi ?? european_aqi` and attach `aqi_scale = "US" | "EU"`. Update the hourly fallback identically.
-2. Update `isValidPayload` for `aqi` to accept any of: `us_aqi`, `european_aqi`, `pm2_5`, `pm10` finite.
-3. `LiveWidget` › `case "aqi"`: read `data.current?.primary_aqi`; when missing, don't render "0 / Good" — render "—" and label from `aqi_scale`. Add units (µg/m³) to `<Metric>` pollutant tiles.
-4. Mirror the same field selection in `alerts.server.ts` and `forecast.server.ts` `forecastAqi` (use `european_aqi` fallback so EU users get a curve).
+## 4. Responsive behavior
 
-**B. Timezone + clocks**
-5. Make the clocks card tick client-side: keep server payload for the zone list, but render `new Date()` inside a `useEffect` interval (1 s) local to the clocks view. Drop the server `now` reliance.
-6. Add a "Use my global timezone" toggle in the clocks settings form; when on, prepend `profile.timezone` to the zone list.
-7. Replace the shared `date()` helper with a small `formatInTz(value, tz)` and pass `profile.timezone` in from `LiveWidget` for date-heavy widgets (quakes/news/spacex/apod/mars). Fallback to browser TZ if profile missing.
+- Dashboard grid: verify breakpoints in `LayoutGrid` — add a proper `xxs` (< 480px) single-column layout, and shrink row height on mobile so widgets stay readable.
+- `AppShell` sidebar: on `< 768px`, collapse into a bottom-safe floating pill or slide-over sheet (hover-to-expand doesn't work on touch); use `useIsMobile`.
+- Header rows across pages (History, Pulse, Foresight, Oracle, Globe): apply the `grid-cols-[minmax(0,1fr)_auto]` + `min-w-0` + `truncate` pattern from responsive-layout guidance so titles + controls never clip on mobile.
+- Command bar: stack vertically under `sm`, full-width inputs.
+- Typography: clamp headline sizes (`clamp(1.5rem, 2.5vw, 2.25rem)`) so nothing overflows on 320–420px widths.
+- Globe canvas: cap DPR on mobile (`renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))`) for smoother frames.
 
-**C. Global-location propagation**
-8. Extend `LiveWidget`'s `settings`-merging block: for widgets in `LOCATION_AWARE = {weather, aqi, news, clocks}` inject `{lat, lon, label, timezone}` from profile when `useGlobalLocation !== false`.
-9. For `news`, when global location is on, append `&gl=<countryFromTZ>` (derive ISO from `profile.home_label` via a tiny lookup, or from timezone → country map already used by Intl `resolvedOptions`).
-10. Show a compact "📍 Home · <label>" chip in cards that are using the global location, so the effect is visible.
+## 5. Performance touch-ups
 
-**D. Units**
-11. Weather renderer respects `profile.units`: convert °C→°F and km/h→mph when `imperial`.
-12. Pass `units` through the same profile query already made in `LiveWidget`; broaden its `enabled` to also cover `weather | aqi | news | clocks`.
+- Add `loading="lazy"` + `decoding="async"` to any `<img>` outside the viewport (APOD, Mars, share cards).
+- Memoize heavy widget renderers (`LiveWidget` body per widget type) to avoid re-render storms on grid drag.
+- Ensure Recharts on `/history` uses `ResponsiveContainer` with a fixed aspect ratio to avoid re-measure loops.
 
-**E. Small polish**
-13. Add `WIDGET_STATES` entries for `clocks`, `quote`, `covid`.
-14. Add `refetchInterval` for `crypto` (60 s) and `fx` (5 min).
+## Files touched (frontend/presentation only)
+
+- `src/styles.css` — motion tokens, transition durations, focus/press states, content-visibility, reduced-motion.
+- `src/router.tsx` — add `defaultPreload: "intent"`.
+- `src/components/omni/AppShell.tsx` — mobile sidebar behavior, spring hover, icon micro-interactions.
+- `src/components/omni/LayoutGrid.tsx` — xxs breakpoint, debounced persistence, skeleton sizing.
+- `src/components/omni/LiveWidget.tsx` — memoization, lazy media, tighter skeleton.
+- `src/components/omni/WidgetShell.tsx` — hover/press polish, will-change hygiene.
+- `src/components/omni/GlobeInner.tsx` — DPR cap on mobile.
+- Route files (`_authenticated/*.tsx`) — header row responsive pattern; no logic changes.
 
 ## Out of scope
-- Sidebar/theme/globe/history/pulse/foresight — untouched.
-- No DB migrations. All fixes live in `src/lib/widget-data.server.ts`, `src/lib/forecast.server.ts`, `src/lib/alerts.server.ts`, `src/components/omni/LiveWidget.tsx`, and a tiny `src/lib/format.ts` helper for TZ/unit formatting.
 
-## Verification after build
-- Load AQI card on London profile → shows a non-zero European AQI + PM values with units.
-- Switch profile home to Delhi in Settings → weather, AQI, news and clocks all shift; clocks card lists `Asia/Kolkata` first and ticks every second.
-- Toggle `units = imperial` → weather card shows °F/mph.
-- Confirm no 429 loops on AQI (validator now accepts EU-only payloads → server cache retains them).
+- No new features, no data/provider changes, no schema changes, no copy rewrites, no palette changes.

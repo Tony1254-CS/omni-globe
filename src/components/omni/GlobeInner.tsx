@@ -88,10 +88,17 @@ function GlobeCanvas({ historicalDate, historicalImageUrl, historicalQuakes, fly
         .pointOfView({ lat: 20, lng: 0, altitude: 2.4 });
       if (cancelled) return;
       globeRef.current = g;
+      try {
+        const renderer = g.renderer?.();
+        const cap = window.matchMedia("(max-width: 768px)").matches ? 1.25 : 1.5;
+        renderer?.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, cap));
+      } catch { /* renderer may not exist in some environments */ }
       const controls = g.controls?.();
       if (controls) {
         controls.autoRotate = true;
         controls.autoRotateSpeed = 0.4;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
       }
       if (!cancelled) setReady(true);
 

@@ -53,6 +53,14 @@
 }
 
 :root {
+  /* Motion system — Apple-grade easing + timing */
+  --ease-out-quint: cubic-bezier(.22,1,.36,1);
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+  --ease-standard: cubic-bezier(.4,0,.2,1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 380ms;
+
   --radius: 1rem;
 
   /* Deep space canvas */
@@ -239,10 +247,9 @@
 .widget-surface {
   --widget-accent: var(--primary);
   transition:
-    transform 480ms cubic-bezier(.22,1,.36,1),
-    box-shadow 480ms cubic-bezier(.22,1,.36,1),
-    backdrop-filter 320ms ease,
-    border-color 280ms ease;
+    transform var(--dur-base) var(--ease-out-quint),
+    box-shadow var(--dur-base) var(--ease-out-quint),
+    border-color var(--dur-fast) var(--ease-standard);
 }
 .widget-surface[data-widget="weather"], .widget-surface[data-widget="aqi"] { --widget-accent: var(--neon-cyan); }
 .widget-surface[data-widget="earthquakes"], .widget-surface[data-widget="neo"] { --widget-accent: var(--neon-amber); }
@@ -275,19 +282,20 @@
   animation: widget-shimmer 1.8s ease-in-out infinite;
 }
 @keyframes widget-shimmer { to { background-position: -180% 0; } }
-.widget-surface:hover {
-  transform: translateY(-3px);
-  backdrop-filter: blur(46px) saturate(190%) brightness(1.07);
-  box-shadow:
-    0 1px 0 oklch(1 0 0 / 0.34) inset,
-    0 -1px 0 oklch(0 0 0 / 0.32) inset,
-    0 0 0 1px color-mix(in oklab, var(--widget-accent) 30%, transparent) inset,
-    0 44px 100px -42px oklch(0 0 0 / 0.95),
-    0 0 60px color-mix(in oklab, var(--widget-accent) 18%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .widget-surface:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 oklch(1 0 0 / 0.34) inset,
+      0 -1px 0 oklch(0 0 0 / 0.32) inset,
+      0 0 0 1px color-mix(in oklab, var(--widget-accent) 30%, transparent) inset,
+      0 30px 70px -32px oklch(0 0 0 / 0.9),
+      0 0 44px color-mix(in oklab, var(--widget-accent) 16%, transparent);
+  }
 }
 .widget-surface:active {
-  transform: translateY(-1px) scale(0.995);
-  transition-duration: 180ms;
+  transform: translateY(0) scale(0.995);
+  transition-duration: var(--dur-fast);
 }
 
 /* Specular sheen — subtle highlight strip that drifts on hover */
@@ -312,7 +320,7 @@
       oklch(1 0 0 / 0.08) 82%,
       transparent 100%);
   transform: translateX(-18%);
-  transition: transform 900ms cubic-bezier(.22,1,.36,1), opacity 400ms ease;
+  transition: transform var(--dur-slow) var(--ease-out-quint), opacity var(--dur-base) var(--ease-standard);
   opacity: 0.85;
 }
 .glass-specular::after {
@@ -366,7 +374,7 @@
     0 1px 0 oklch(1 0 0 / 0.22) inset,
     0 0 0 1px color-mix(in oklab, white 10%, transparent) inset,
     0 34px 100px -30px oklch(0 0 0 / 0.92);
-  transition: width 520ms cubic-bezier(.22,1,.36,1), box-shadow 320ms ease;
+  transition: width var(--dur-slow) var(--ease-out-quint), box-shadow var(--dur-base) var(--ease-standard);
 }
 .sidebar-rail[data-expanded="true"] { width: 256px; }
 
@@ -383,12 +391,16 @@
   border-radius: 99px;
 }
 
-.sidebar-label { opacity: 0; transform: translateX(-7px); transition: opacity 160ms ease, transform 280ms cubic-bezier(.22,1,.36,1); pointer-events: none; }
-.sidebar-rail[data-expanded="true"] .sidebar-label { opacity: 1; transform: translateX(0); transition-delay: 105ms; }
-.sidebar-link { position: relative; transition: color 220ms ease, background 220ms ease, box-shadow 220ms ease; }
+.sidebar-label { opacity: 0; transform: translateX(-7px); transition: opacity var(--dur-fast) var(--ease-standard), transform var(--dur-base) var(--ease-out-quint); pointer-events: none; }
+.sidebar-rail[data-expanded="true"] .sidebar-label { opacity: 1; transform: translateX(0); transition-delay: 90ms; }
+.sidebar-link { position: relative; transition: color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard); }
 .sidebar-link:hover { background: color-mix(in oklab, var(--foreground) 6%, transparent); }
+.sidebar-link:hover svg { transform: scale(1.08); }
+.sidebar-link svg { transition: transform var(--dur-base) var(--ease-spring); }
 .sidebar-link.is-active { background: color-mix(in oklab, var(--foreground) 8%, transparent); box-shadow: 0 1px 0 oklch(1 0 0 / .1) inset; }
-.sidebar-link.is-active::before { content: ""; position: absolute; left: 0; width: 2px; height: 18px; border-radius: 99px; background: var(--primary); box-shadow: 0 0 14px color-mix(in oklab, var(--primary) 70%, transparent); }
+.sidebar-link.is-active::before { content: ""; position: absolute; left: 0; width: 2px; height: 18px; border-radius: 99px; background: var(--primary); box-shadow: 0 0 14px color-mix(in oklab, var(--primary) 70%, transparent); animation: rail-in var(--dur-slow) var(--ease-spring); }
+@keyframes rail-in { from { height: 4px; opacity: 0; } to { height: 18px; opacity: 1; } }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
 .brand-orb {
   background:
     radial-gradient(90% 90% at 30% 20%, color-mix(in oklab, white 30%, transparent) 0%, transparent 55%),
@@ -415,24 +427,24 @@
   border: 1px solid var(--glass-border);
   box-shadow: 0 1px 0 oklch(1 0 0 / .18) inset;
   backdrop-filter: blur(18px) saturate(160%);
-  transition: background 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+  transition: background var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-out-quint);
 }
 .liquid-control:hover {
   background: color-mix(in oklab, var(--foreground) 10%, transparent);
   box-shadow: 0 1px 0 oklch(1 0 0 / .28) inset, 0 10px 26px -16px oklch(0 0 0 / .8);
   transform: translateY(-1px);
 }
-.liquid-control:active { transform: translateY(0) scale(0.97); }
+.liquid-control:active { transform: translateY(0) scale(0.96); transition-duration: 80ms; }
 
 .primary-glass-button {
   color: var(--primary-foreground);
   background: linear-gradient(145deg, color-mix(in oklab, var(--primary) 88%, white 12%), var(--primary));
   border: 1px solid color-mix(in oklab, var(--primary) 55%, white);
   box-shadow: 0 1px 0 oklch(1 0 0 / .55) inset, 0 16px 36px -16px color-mix(in oklab, var(--primary) 70%, transparent);
-  transition: transform 240ms ease, filter 240ms ease, box-shadow 240ms ease;
+  transition: transform var(--dur-fast) var(--ease-out-quint), filter var(--dur-fast) var(--ease-standard), box-shadow var(--dur-base) var(--ease-standard);
 }
 .primary-glass-button:hover { transform: translateY(-1px); filter: brightness(1.07); box-shadow: 0 1px 0 oklch(1 0 0 / .6) inset, 0 22px 46px -18px color-mix(in oklab, var(--primary) 80%, transparent); }
-.primary-glass-button:active { transform: translateY(0) scale(0.985); }
+.primary-glass-button:active { transform: translateY(0) scale(0.97); transition-duration: 80ms; }
 
 .error-orb { background: color-mix(in oklab, var(--neon-amber) 9%, transparent); border: 1px solid color-mix(in oklab, var(--neon-amber) 22%, var(--glass-border)); box-shadow: 0 1px 0 oklch(1 0 0 / .14) inset; }
 .resize-readout { position: fixed; z-index: 80; left: 50%; bottom: 28px; transform: translateX(-50%); border: 1px solid var(--glass-border); border-radius: 999px; background: var(--glass-bg); backdrop-filter: blur(20px); padding: 7px 13px; color: var(--foreground); font-size: 11px; font-weight: 700; box-shadow: 0 16px 40px -18px oklch(0 0 0 / .9); }
