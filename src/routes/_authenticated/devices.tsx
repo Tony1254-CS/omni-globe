@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Cpu, Loader2, Trash2, Zap } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 
-import { AppShell } from "@/components/omni/AppShell";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,7 @@ function DevicesPage() {
   const chartData = (readings ?? []).map((r) => ({ t: new Date(r.recorded_at).toLocaleTimeString(), v: r.value }));
 
   return (
-    <AppShell>
+    <>
       <div className="mx-auto max-w-6xl space-y-6">
         <header>
           <h1 className="flex items-center gap-2 text-2xl font-bold"><Cpu className="h-6 w-6 text-primary" /> IoT Devices</h1>
@@ -130,6 +130,6 @@ function DevicesPage() {
           )}
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

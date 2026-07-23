@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Sparkles, Loader2 } from "lucide-react";
 
-import { AppShell } from "@/components/omni/AppShell";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PRESETS } from "@/lib/presets";
@@ -31,7 +31,7 @@ function PresetsPage() {
   });
 
   return (
-    <AppShell>
+    <>
       <div className="mx-auto max-w-5xl space-y-6">
         <header>
           <h1 className="flex items-center gap-2 text-2xl font-bold"><Sparkles className="h-6 w-6 text-primary" /> Vertical Presets</h1>
@@ -58,6 +58,6 @@ function PresetsPage() {
           ))}
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }
