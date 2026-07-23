@@ -65,9 +65,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         onFocusCapture={openSidebar}
         onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) closeSidebar(); }}
         data-expanded={sidebarOpen}
-        className="sidebar-rail group/sidebar fixed inset-y-4 left-4 z-40 hidden w-[72px] shrink-0 flex-col overflow-hidden rounded-[22px] md:flex"
+        className="sidebar-rail group/sidebar fixed inset-y-4 left-4 z-40 hidden max-h-[calc(100vh-2rem)] w-[72px] shrink-0 flex-col rounded-[22px] md:flex"
       >
-        <div className="flex items-center gap-2 overflow-hidden px-3 py-6">
+        <div className="flex shrink-0 items-center gap-2 overflow-hidden px-3 py-5">
           <div className="brand-orb grid h-10 w-10 shrink-0 place-items-center rounded-xl">
             <Globe2 className="h-5 w-5 text-primary" />
           </div>
@@ -75,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             OMNISPHERE
           </span>
         </div>
-        <nav className="flex-1 space-y-1 overflow-hidden px-2">
+        <nav className="sidebar-scroll min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2 py-1">
           {NAV.map((item) => {
             const active =
               location.pathname === item.to ||
@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <button
           onClick={signOut}
-           className="sidebar-link m-2 flex h-11 items-center gap-4 overflow-hidden rounded-xl px-3 text-sm text-muted-foreground hover:text-foreground"
+           className="sidebar-link m-2 flex h-11 shrink-0 items-center gap-4 overflow-hidden rounded-xl px-3 text-sm text-muted-foreground hover:text-foreground"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           <span className="sidebar-label whitespace-nowrap">
@@ -109,6 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
         </button>
       </aside>
+
 
       <div className="min-w-0 flex-1 md:ml-20">
         <header className="command-bar sticky top-3 z-30 mx-3 mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-2xl px-4 py-3 md:mx-6 md:px-6">
