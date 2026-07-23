@@ -1,9 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 
-let admin: ReturnType<typeof createClient> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let admin: any = null;
 function getAdmin() {
   if (admin) return admin;
-  admin = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin = createClient<any>(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return admin;
