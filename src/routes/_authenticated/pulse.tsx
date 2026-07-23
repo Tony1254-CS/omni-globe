@@ -150,7 +150,7 @@ function PulsePage() {
 function PulseHero({ pulse, gradient, createdAt, onShare, onDownload, innerRef }: {
   pulse: Pulse; gradient: string; createdAt: string;
   onShare: () => void; onDownload: () => void;
-  innerRef: React.RefObject<HTMLDivElement>;
+  innerRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const toneClass = (t: string) => t === "alert" ? "text-rose-300" : t === "warm" ? "text-amber-300" : "text-emerald-300";
   const nowStr = useMemo(() => new Date(createdAt).toLocaleString([], { weekday: "long", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }), [createdAt]);
