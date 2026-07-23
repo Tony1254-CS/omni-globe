@@ -28,17 +28,19 @@ function mapToGemini(lovableModel: string | undefined): string {
 }
 
 export async function callChat(opts: ChatOptions): Promise<string> {
-  const { system, user, jsonMode, timeoutMs = 60000, model } = opts;
+  const { system, user, messages, jsonMode, timeoutMs = 60000, model } = opts;
 
   const geminiKey = process.env.GEMINI_API_KEY;
   const lovableKey = process.env.LOVABLE_API_KEY;
 
-  const body: Record<string, unknown> = {
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
-  };
+  const msgs: ChatMessage[] = messages
+    ? messages
+    : [
+        ...(system ? [{ role: "system" as const, content: system }] : []),
+        ...(user ? [{ role: "user" as const, content: user }] : []),
+      ];
+
+  const body: Record<string, unknown> = { messages: msgs };
   if (jsonMode) body.response_format = { type: "json_object" };
 
   let url: string;
