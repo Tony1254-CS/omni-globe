@@ -13,7 +13,8 @@ export function WidgetShell({
   children: ReactNode;
 }) {
   return (
-    <div className="glass widget-surface relative flex h-full flex-col">
+    <div className="liquid-glass widget-surface relative flex h-full flex-col overflow-hidden">
+      <div className="glass-specular" aria-hidden="true" />
       <div className="widget-handle flex cursor-grab items-center justify-between border-b border-glass-border px-3 py-2 active:cursor-grabbing">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           <GripVertical className="h-3.5 w-3.5" />
@@ -29,7 +30,7 @@ export function WidgetShell({
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-auto p-4">{children}</div>
+      <div className="relative z-[1] flex-1 overflow-auto p-4">{children}</div>
     </div>
   );
 }

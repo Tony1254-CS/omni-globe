@@ -39,6 +39,7 @@ function ClientGrid({
 }) {
   const [pending, setPending] = useState<Layout | null>(null);
   const [resizing, setResizing] = useState(false);
+  const [resizeSize, setResizeSize] = useState<{ w: number; h: number } | null>(null);
   const lastSaved = useRef("");
   useEffect(() => {
     if (!pending) return;
@@ -54,6 +55,8 @@ function ClientGrid({
   }, [pending, onLayoutChange]);
 
   return (
+    <div className="relative">
+    {resizeSize && <div className="resize-readout" role="status">{resizeSize.w} × {resizeSize.h}</div>}
     <ResponsiveGrid
       className={resizing ? "layout is-resizing" : "layout"}
       layout={items}
@@ -66,9 +69,11 @@ function ClientGrid({
       isResizable
       resizeHandles={["se", "sw", "e", "w", "s"]}
       onResizeStart={() => setResizing(true)}
-      onResizeStop={() => setResizing(false)}
+      onResize={(_layout, _old, item) => setResizeSize({ w: item.w, h: item.h })}
+      onResizeStop={() => { setResizing(false); setResizeSize(null); }}
     >
       {children}
     </ResponsiveGrid>
+    </div>
   );
 }

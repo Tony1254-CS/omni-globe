@@ -88,17 +88,18 @@ function Dashboard() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
         <div>
-          <h1 className="font-display text-3xl font-semibold">Dashboard</h1>
+          <div className="mb-2 inline-flex items-center gap-2 text-[10px] font-semibold uppercase text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Live command canvas</div>
+          <h1 className="font-display text-3xl font-semibold">System Overview</h1>
           <p className="text-sm text-muted-foreground">
             Drag, resize, arrange. Your layout is saved automatically.
           </p>
         </div>
         <button
           onClick={() => setPickerOpen(true)}
-          className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-premium transition duration-200 hover:-translate-y-0.5 hover:brightness-105"
+           className="primary-glass-button flex shrink-0 items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"
         >
           <Plus className="h-4 w-4" /> Add widget
         </button>
@@ -127,6 +128,7 @@ function Dashboard() {
           </button>
         </motion.div>
       ) : (
+        <div className="asymmetric-workspace">
         <LayoutGrid
           items={layoutItems}
           onLayoutChange={(next) => {
@@ -148,6 +150,7 @@ function Dashboard() {
             );
           })}
         </LayoutGrid>
+        </div>
       )}
 
       <WidgetPicker
