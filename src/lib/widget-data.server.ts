@@ -281,11 +281,24 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
       try {
         return result(type, "NASA", await json(`https://api.nasa.gov/planetary/apod?api_key=${encodeURIComponent(key)}&thumbs=true`));
       } catch {
-        const xml = await feed("https://apod.nasa.gov/apod.rss");
-        const item = xml.match(/<item>([\s\S]*?)<\/item>/)?.[1] ?? "";
-        const field = (name: string) => decodeXml(item.match(new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`))?.[1] ?? "");
-        const image = item.match(/<enclosure[^>]+url=["']([^"']+)/)?.[1];
-        return result(type, "NASA APOD feed", { title: field("title"), explanation: field("description"), url: image, hdurl: field("link") });
+        try {
+          const xml = await feed("https://apod.nasa.gov/apod.rss");
+          const item = xml.match(/<item>([\s\S]*?)<\/item>/)?.[1] ?? "";
+          const field = (name: string) => decodeXml(item.match(new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`))?.[1] ?? "");
+          const description = item.match(/<description>([\s\S]*?)<\/description>/)?.[1] ?? "";
+          const image = item.match(/<enclosure[^>]+url=["']([^"']+)/)?.[1]
+            ?? description.match(/<img[^>]+src=["']([^"']+)/)?.[1];
+          const feedResult = result(type, "NASA APOD feed", { title: field("title"), explanation: field("description"), url: image, hdurl: field("link") });
+          return assertUsable(feedResult);
+        } catch {
+          const archive = await json("https://images-api.nasa.gov/search?q=astronomy&media_type=image&page_size=1&year_start=2024");
+          const item = archive.collection?.items?.[0];
+          return result(type, "NASA Image Library", {
+            title: item?.data?.[0]?.title ?? "NASA astronomy image",
+            explanation: item?.data?.[0]?.description ?? "A recent image from NASA's astronomy archive.",
+            url: item?.links?.find((link: any) => link.render === "image")?.href,
+          });
+        }
       }
     }
     case "mars": {
@@ -350,8 +363,7 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
       }
     }
     case "reddit": {
-      // Reddit's public JSON and RSS mirrors are unreliable and often 403/429.
-      // Use Hacker News as a Reddit replacement (labelled by subreddit for continuity).
+      // Community discussions use Hacker News because public Reddit endpoints block server traffic.
       const subreddit = text(settings.subreddit, "worldnews").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30);
       const topicMap: Record<string, string> = {
         worldnews: "world news", technology: "technology", science: "science",
