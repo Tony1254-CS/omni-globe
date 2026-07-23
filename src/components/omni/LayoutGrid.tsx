@@ -50,9 +50,11 @@ function ClientGrid({
         onLayoutChange(pending as unknown as LayoutItem[]);
       }
       setPending(null);
-    }, 700);
+    }, 400);
     return () => clearTimeout(t);
   }, [pending, onLayoutChange]);
+
+  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches;
 
   return (
     <div className="relative">
@@ -60,13 +62,13 @@ function ClientGrid({
     <ResponsiveGrid
       className={resizing ? "layout is-resizing" : "layout"}
       layout={items}
-      cols={12}
-      rowHeight={60}
-      margin={[16, 16]}
+      cols={isMobile ? 4 : 12}
+      rowHeight={isMobile ? 56 : 60}
+      margin={[isMobile ? 10 : 16, isMobile ? 10 : 16]}
       draggableHandle=".widget-handle"
       onLayoutChange={(next: Layout) => setPending(next)}
       compactType="vertical"
-      isResizable
+      isResizable={!isMobile}
       resizeHandles={["se", "sw", "e", "w", "s"]}
       onResizeStart={() => setResizing(true)}
       onResize={(_layout, _old, item) => item && setResizeSize({ w: item.w, h: item.h })}
