@@ -12,7 +12,7 @@ import { TrustBadge } from "@/components/omni/TrustBadge";
 import { ForecastCard } from "@/components/omni/ForecastCard";
 import { LocationSearch } from "@/components/omni/LocationSearch";
 import { getMyProfile } from "@/lib/profile.functions";
-import { formatInTz, formatTimeInTz, cToF, kmhToMph, countryFromTz } from "@/lib/format";
+import { formatInTz, formatTimeInTz, formatOffsetLabel, isValidTz, cToF, kmhToMph, countryFromTz } from "@/lib/format";
 
 type Props = { id: string; type: string; settings: unknown };
 
