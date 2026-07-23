@@ -62,11 +62,8 @@ export const getShareBySlug = createServerFn({ method: "GET" })
         },
       },
     });
-    const { data: row, error } = await supa
-      .from("shared_dashboards")
-      .select("title, snapshot, created_at")
-      .eq("slug", data.slug)
-      .maybeSingle();
+    const { data: rows, error } = await supa.rpc("get_shared_dashboard", { _slug: data.slug });
     if (error) throw error;
+    const row = Array.isArray(rows) ? rows[0] ?? null : rows ?? null;
     return row;
   });
