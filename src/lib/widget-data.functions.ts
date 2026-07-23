@@ -15,6 +15,7 @@ export const getWidgetData = createServerFn({ method: "POST" })
     try {
       return await fetchWidgetData(data.type, data.settings);
     } catch (err) {
+      console.error(`[widget:${data.type}]`, err);
       const retryAt = typeof err === "object" && err && "retryAt" in err ? new Date(Number((err as { retryAt: number }).retryAt)).toISOString() : undefined;
       const rateLimited = err instanceof Error && /429|cooling down/i.test(err.message);
       return {
