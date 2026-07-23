@@ -48,17 +48,22 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const anomaly = useMemo(() => scoreWidget(type, query.data?.data), [type, query.data]);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="mb-2 flex items-center justify-end gap-1">
-        <button title="Refresh data" aria-label="Refresh data" onClick={() => query.refetch()} className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
-          <RefreshCw className={`h-3.5 w-3.5 ${query.isFetching ? "animate-spin" : ""}`} />
-        </button>
-        {Object.keys(DEFAULT_WIDGET_SETTINGS[type] ?? {}).length > 0 && (
-          <button title="Widget settings" aria-label="Widget settings" onClick={() => setEditing((v) => !v)} className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
-            <Settings2 className="h-3.5 w-3.5" />
+      <div className="mb-2 flex items-center justify-between gap-1">
+        <AttentionBadge score={anomaly} />
+        <div className="flex items-center gap-1">
+          <button title="Refresh data" aria-label="Refresh data" onClick={() => query.refetch()} className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
+            <RefreshCw className={`h-3.5 w-3.5 ${query.isFetching ? "animate-spin" : ""}`} />
           </button>
-        )}
+          {Object.keys(DEFAULT_WIDGET_SETTINGS[type] ?? {}).length > 0 && (
+            <button title="Widget settings" aria-label="Widget settings" onClick={() => setEditing((v) => !v)} className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
+              <Settings2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {editing ? (
@@ -70,7 +75,10 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
           <div><AlertTriangle className="mx-auto h-5 w-5 text-neon-amber" /><p className="mt-2 text-xs font-medium">Live source unavailable</p><p className="mt-1 text-[11px] text-muted-foreground">{query.error.message}</p><button onClick={() => query.refetch()} className="mt-3 rounded bg-secondary px-2 py-1 text-xs">Try again</button></div>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto"><WidgetView type={type} data={query.data?.data as any} /></div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          <WidgetView type={type} data={query.data?.data as any} />
+          {FORECASTABLE.has(type) && query.data?.data && <ForecastCard type={type as any} params={settings as any} />}
+        </div>
       )}
 
       {query.data && !editing && <div className="mt-2 flex shrink-0 justify-between border-t border-glass-border pt-2 text-[10px] text-muted-foreground"><span>{query.data.source}</span><span>{new Date(query.data.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>}
