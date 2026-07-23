@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Globe2, LayoutDashboard, Settings, Radar, LogOut, Bell } from "lucide-react";
+import { Globe2, LayoutDashboard, Settings, Radar, LogOut, Bell, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/globe", label: "Globe", icon: Globe2 },
+  { to: "/briefing", label: "Briefing", icon: Sparkles },
   { to: "/alerts", label: "Alerts", icon: Bell },
   { to: "/history", label: "History", icon: Radar },
   { to: "/settings", label: "Settings", icon: Settings },
