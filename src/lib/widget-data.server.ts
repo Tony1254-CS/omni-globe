@@ -1,4 +1,4 @@
-import type { WidgetDataResult, WidgetSettings } from "./widget-data.types";
+import type { WidgetDataResult, WidgetDataValue, WidgetSettings } from "./widget-data.types";
 
 const number = (value: unknown, fallback: number) => {
   const parsed = Number(value);
@@ -17,7 +17,7 @@ async function json(url: string) {
   return response.json() as Promise<any>;
 }
 
-const result = (type: string, source: string, data: unknown): WidgetDataResult => ({
+const result = (type: string, source: string, data: WidgetDataValue): WidgetDataResult => ({
   type,
   source,
   updatedAt: new Date().toISOString(),
@@ -80,7 +80,7 @@ export async function fetchWidgetData(type: string, settings: WidgetSettings): P
       const start = new Date().toISOString().slice(0, 10);
       const data = await json(`https://api.nasa.gov/neo/rest/v1/feed?start_date=${start}&api_key=${encodeURIComponent(key)}`);
       const objects = Object.values(data.near_earth_objects ?? {}).flat().slice(0, 12);
-      return result(type, "NASA", objects);
+      return result(type, "NASA", objects as WidgetDataValue);
     }
     case "clocks": {
       const zones = text(settings.zones, "UTC,America/New_York,Asia/Tokyo").split(",").map((z) => z.trim()).filter(Boolean).slice(0, 6);

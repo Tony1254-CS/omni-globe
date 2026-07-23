@@ -1,10 +1,18 @@
 export type WidgetSettings = Record<string, string | number | boolean | null>;
 
+export type WidgetDataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | WidgetDataValue[]
+  | { [key: string]: WidgetDataValue | undefined };
+
 export type WidgetDataResult = {
   type: string;
   source: string;
   updatedAt: string;
-  data: unknown;
+  data: WidgetDataValue;
 };
 
 export const DEFAULT_WIDGET_SETTINGS: Record<string, WidgetSettings> = {
