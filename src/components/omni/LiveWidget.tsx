@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, ExternalLink, Loader2, RefreshCw, Save, Settings2, TrendingDown, TrendingUp } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { getWidgetData } from "@/lib/widget-data.functions";
 import { DEFAULT_WIDGET_SETTINGS, type WidgetSettings } from "@/lib/widget-data.types";
@@ -119,5 +119,5 @@ function WidgetView({ type, data }: { type: string; data: any }) {
 
 function Metric({ label, value }: { label: string; value: unknown }) { return <div className="rounded bg-secondary/50 p-2"><p className="text-[10px] uppercase text-muted-foreground">{label}</p><p className="mt-0.5 truncate text-sm font-semibold">{String(value ?? "—")}</p></div>; }
 function Change({ value }: { value: unknown }) { const n = Number(value ?? 0); return <span className={`inline-flex items-center text-xs font-semibold ${n >= 0 ? "text-neon-lime" : "text-destructive"}`}>{n >= 0 ? <TrendingUp className="mr-1 h-3 w-3" /> : <TrendingDown className="mr-1 h-3 w-3" />}{num(Math.abs(n), 2)}%</span>; }
-function List({ items, render }: { items: any[]; render: (item: any) => React.ReactNode }) { return items?.length ? <div className="space-y-1.5">{items.map((item, index) => <div key={item.id ?? item.url ?? item.link ?? index} className="flex items-center gap-2 rounded bg-secondary/40 p-2 text-xs">{render(item)}</div>)}</div> : <Empty />; }
+function List({ items, render }: { items: any[]; render: (item: any) => ReactNode }) { return items?.length ? <div className="space-y-1.5">{items.map((item, index) => <div key={item.id ?? item.url ?? item.link ?? index} className="flex items-center gap-2 rounded bg-secondary/40 p-2 text-xs">{render(item)}</div>)}</div> : <Empty />; }
 function Empty({ label = "No current data" }: { label?: string }) { return <div className="grid h-full place-items-center text-center text-xs text-muted-foreground">{label}</div>; }
