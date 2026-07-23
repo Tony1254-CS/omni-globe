@@ -34,7 +34,7 @@ function HistoryPage() {
   useEffect(() => setDraft(search), [search]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(search);
   const activity = useQuery({ queryKey: ["personal-history", search.days, search.category], queryFn: () => activityFn({ data: { days: Math.round(search.days), category: search.category } }), enabled: search.view === "activity", staleTime: 60_000 });
-  const trends = useQuery({ queryKey: ["trend-history", search.kind, search.days, search.lat, search.lon, search.coin, search.magnitude], queryFn: () => historyFn({ data: { kind: search.kind, days: search.days, lat: search.lat, lon: search.lon, coin: search.coin, magnitude: search.magnitude } }), enabled: search.view === "trends", staleTime: 10 * 60_000, retry: 1 });
+  const trends = useQuery({ queryKey: ["trend-history", search.kind, search.days, search.lat, search.lon, search.coin, search.magnitude], queryFn: () => historyFn({ data: { kind: search.kind, days: search.days, lat: search.lat, lon: search.lon, coin: search.coin, magnitude: search.magnitude } }), enabled: search.view === "trends", staleTime: 10 * 60_000, retry: (failureCount, error) => failureCount < 1 && !/429|temporarily unavailable/i.test(error.message) });
   const counts = useMemo(() => (activity.data ?? []).reduce<Record<string, number>>((acc, item) => ({ ...acc, [item.category]: (acc[item.category] ?? 0) + 1 }), {}), [activity.data]);
   const apply = () => navigate({ search: draft, replace: true });
   const reset = () => { setDraft(defaults); navigate({ search: defaults, replace: true }); };
