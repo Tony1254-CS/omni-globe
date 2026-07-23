@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Bot, Loader2, Play, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
-import { AppShell } from "@/components/omni/AppShell";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -63,7 +63,7 @@ function AgentsPage() {
   });
 
   return (
-    <AppShell>
+    <>
       <div className="mx-auto max-w-6xl space-y-6">
         <header>
           <h1 className="flex items-center gap-2 text-2xl font-bold"><Bot className="h-6 w-6 text-primary" /> Custom Agents</h1>
@@ -142,6 +142,6 @@ function AgentsPage() {
           </div>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

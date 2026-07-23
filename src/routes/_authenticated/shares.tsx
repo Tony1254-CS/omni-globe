@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Share2, Trash2, Copy } from "lucide-react";
 
-import { AppShell } from "@/components/omni/AppShell";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,7 @@ function SharesPage() {
   const base = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
-    <AppShell>
+    <>
       <div className="mx-auto max-w-4xl space-y-6">
         <header>
           <h1 className="flex items-center gap-2 text-2xl font-bold"><Share2 className="h-6 w-6 text-primary" /> Shared Dashboards</h1>
@@ -73,6 +73,6 @@ function SharesPage() {
           {(shares ?? []).length === 0 && <p className="text-sm text-muted-foreground">No shares yet.</p>}
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

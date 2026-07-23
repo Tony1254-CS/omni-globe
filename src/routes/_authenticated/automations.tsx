@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Bell, Loader2, Trash2, Zap } from "lucide-react";
 
-import { AppShell } from "@/components/omni/AppShell";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -72,7 +72,7 @@ function AutomationsPage() {
   });
 
   return (
-    <AppShell>
+    <>
       <div className="mx-auto max-w-5xl space-y-6">
         <header>
           <h1 className="flex items-center gap-2 text-2xl font-bold"><Zap className="h-6 w-6 text-primary" /> Automations</h1>
@@ -170,6 +170,6 @@ function AutomationsPage() {
           </div>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }

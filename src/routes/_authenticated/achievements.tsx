@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Trophy, Lock } from "lucide-react";
 
-import { AppShell } from "@/components/omni/AppShell";
+
 import { Card } from "@/components/ui/card";
 import { listAchievements } from "@/lib/achievements.functions";
 
@@ -22,7 +22,7 @@ function AchievementsPage() {
   const unlocked = (data ?? []).filter((a) => a.unlocked_at).length;
 
   return (
-    <AppShell>
+    <>
       <div className="mx-auto max-w-4xl space-y-6">
         <header>
           <h1 className="flex items-center gap-2 text-2xl font-bold"><Trophy className="h-6 w-6 text-primary" /> Achievements</h1>
@@ -43,6 +43,6 @@ function AchievementsPage() {
           ))}
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }
