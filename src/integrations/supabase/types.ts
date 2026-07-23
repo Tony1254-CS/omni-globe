@@ -550,6 +550,57 @@ export type Database = {
         }
         Relationships: []
       }
+      predictions: {
+        Row: {
+          batch_id: string
+          category: string
+          claim: string
+          created_at: string
+          evidence: Json
+          horizon: string
+          id: string
+          outcome: boolean | null
+          probability: number
+          reasoning: string | null
+          resolved: boolean
+          resolved_at: string | null
+          sources: Json
+          user_id: string
+        }
+        Insert: {
+          batch_id: string
+          category: string
+          claim: string
+          created_at?: string
+          evidence?: Json
+          horizon: string
+          id?: string
+          outcome?: boolean | null
+          probability: number
+          reasoning?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          sources?: Json
+          user_id: string
+        }
+        Update: {
+          batch_id?: string
+          category?: string
+          claim?: string
+          created_at?: string
+          evidence?: Json
+          horizon?: string
+          id?: string
+          outcome?: boolean | null
+          probability?: number
+          reasoning?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          sources?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -607,6 +658,30 @@ export type Database = {
           created_at?: string
           expires_at?: string
           payload?: Json
+        }
+        Relationships: []
+      }
+      pulses: {
+        Row: {
+          created_at: string
+          id: string
+          pulse: Json
+          snapshot: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pulse: Json
+          snapshot: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pulse?: Json
+          snapshot?: Json
+          user_id?: string
         }
         Relationships: []
       }
