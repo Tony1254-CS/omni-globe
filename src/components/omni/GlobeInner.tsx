@@ -5,6 +5,8 @@ import { Loader2 } from "lucide-react";
 
 import { getWidgetData } from "@/lib/widget-data.functions";
 import { listFavourites } from "@/lib/favourites.functions";
+import earthNight from "@/assets/earth-night.jpg";
+import earthTopology from "@/assets/earth-topology.png";
 
 type IssPos = { latitude: number; longitude: number; altitude: number; velocity: number };
 type Quake = { id: string; magnitude: number; place: string; time: number; lat: number; lon: number; url: string };
@@ -65,8 +67,8 @@ function GlobeCanvas() {
       const mod = await import("globe.gl");
       if (cancelled || !containerRef.current) return;
       const g = (mod.default as any)(containerRef.current)
-        .globeImageUrl("//unpkg.com/three-globe/example/img/earth-night.jpg")
-        .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+        .globeImageUrl(earthNight)
+        .bumpImageUrl(earthTopology)
         .backgroundColor("rgba(0,0,0,0)")
         .atmosphereColor("#38bdf8")
         .atmosphereAltitude(0.22)
