@@ -99,25 +99,27 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
         <SettingsForm type={type} draft={draft} setDraft={setDraft} onSave={() => save.mutate()} saving={save.isPending} />
       ) : query.isLoading ? (
         <div className="widget-skeleton flex flex-1 flex-col justify-end gap-3" aria-label="Loading live data"><div className="h-20 rounded-lg" /><div className="h-3 w-2/3 rounded-full" /><div className="h-3 w-1/3 rounded-full" /></div>
-      ) : query.isError || query.data?.error ? (
+      ) : query.data?.data ? (
+        // Always render data if we have any — even stale. The status footer shows freshness.
+        <div className="widget-content min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
+          <WidgetView type={type} data={query.data.data as any} />
+          {FORECASTABLE.has(type) && <ForecastCard type={type as any} params={settings as any} />}
+        </div>
+      ) : (
+        // Only show the error card when we've NEVER had data for this widget.
         <div className="flex flex-1 flex-col justify-between py-1">
           <div className="flex items-start gap-3">
             <div className="widget-state-icon grid h-10 w-10 shrink-0 place-items-center rounded-xl"><StateIcon className="h-4.5 w-4.5" /></div>
             <div className="min-w-0"><p className="text-sm font-semibold">{state.unavailable}</p><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{state.hint}</p></div>
           </div>
           <div className="mt-4 flex items-end justify-between gap-3 border-t border-glass-border pt-3">
-            <div><p className="text-[9px] font-semibold uppercase text-muted-foreground">{query.data?.status === "rate-limited" ? "Provider cooldown" : "Connection status"}</p>{query.data?.retryAt && <p className="mt-1 text-[10px] text-muted-foreground">Retry {new Date(query.data.retryAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}</div>
-            <button disabled={retryBlocked} onClick={() => query.refetch()} className="liquid-control grid h-8 w-8 shrink-0 place-items-center rounded-full disabled:cursor-not-allowed disabled:opacity-35" aria-label={retryBlocked ? "Retry scheduled" : "Retry connection"}><RefreshCw className="h-3.5 w-3.5" /></button>
+            <div><p className="text-[9px] font-semibold uppercase text-muted-foreground">Warming up provider</p><p className="mt-1 text-[10px] text-muted-foreground">Data will appear within a minute.</p></div>
+            <button disabled={retryBlocked} onClick={() => query.refetch()} className="liquid-control grid h-8 w-8 shrink-0 place-items-center rounded-full disabled:cursor-not-allowed disabled:opacity-35" aria-label="Retry connection"><RefreshCw className="h-3.5 w-3.5" /></button>
           </div>
-        </div>
-      ) : (
-        <div className="widget-content min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
-          <WidgetView type={type} data={query.data?.data as any} />
-          {FORECASTABLE.has(type) && query.data?.data && <ForecastCard type={type as any} params={settings as any} />}
         </div>
       )}
 
-      {query.data && !query.data.error && !editing && <div className="mt-2 flex shrink-0 justify-between border-t border-glass-border pt-2 text-[10px] text-muted-foreground"><span>{query.data.stale ? "Cached · " : ""}{query.data.source}</span><span>{new Date(query.data.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>}
+      {query.data?.data && !editing && <div className="mt-2 flex shrink-0 justify-between border-t border-glass-border pt-2 text-[10px] text-muted-foreground"><span>{query.data.stale ? "Cached · " : ""}{query.data.source}</span><span>{new Date(query.data.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>}
     </div>
   );
 }
