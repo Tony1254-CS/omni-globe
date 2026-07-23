@@ -435,7 +435,15 @@ export const GLOBAL_WARMUP_WIDGETS: Array<{ type: string; settings: WidgetSettin
 
 export async function warmAllProviders() {
   const results: Array<{ type: string; ok: boolean; source?: string; error?: string }> = [];
-  await Promise.all(GLOBAL_WARMUP_WIDGETS.map(async ({ type, settings }) => {
+  const { data: configuredRows } = await supabaseAdmin.from("widget_configs").select("widget_type, settings");
+  const configuredWidgets = (configuredRows ?? []).map((row) => ({
+    type: row.widget_type,
+    settings: row.settings && typeof row.settings === "object" && !Array.isArray(row.settings) ? row.settings as WidgetSettings : {},
+  }));
+  const uniqueWidgets = new Map<string, { type: string; settings: WidgetSettings }>();
+  for (const widget of [...GLOBAL_WARMUP_WIDGETS, ...configuredWidgets]) uniqueWidgets.set(cacheKeyFor(widget.type, widget.settings), widget);
+
+  await Promise.all([...uniqueWidgets.values()].map(async ({ type, settings }) => {
     const cacheKey = cacheKeyFor(type, settings);
     try {
       // Force a refresh path regardless of current cache state.
