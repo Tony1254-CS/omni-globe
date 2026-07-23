@@ -4,9 +4,20 @@ export const Route = createFileRoute("/api/public/hooks/refresh-widgets")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Accept any of: Supabase apikey header, Vercel Cron (user-agent),
+        // or an optional CRON_SECRET bearer. Keeps warmer callable from
+        // pg_cron, Vercel Cron, and manual curl.
         const suppliedKey = request.headers.get("apikey");
         const expectedKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-        if (!expectedKey || suppliedKey !== expectedKey) return new Response("Unauthorized", { status: 401 });
+        const authHeader = request.headers.get("authorization") ?? "";
+        const cronSecret = process.env.CRON_SECRET;
+        const ua = request.headers.get("user-agent") ?? "";
+        const isVercelCron = ua.toLowerCase().includes("vercel-cron");
+        const okApiKey = expectedKey && suppliedKey === expectedKey;
+        const okCronSecret = cronSecret && authHeader === `Bearer ${cronSecret}`;
+        if (!okApiKey && !okCronSecret && !isVercelCron) {
+          return new Response("Unauthorized", { status: 401 });
+        }
         const { warmAllProviders } = await import("@/lib/widget-data.server");
         const results = await warmAllProviders();
         return Response.json({
