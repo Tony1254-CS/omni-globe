@@ -42,7 +42,7 @@ function Dashboard() {
 
   const addMut = useMutation({
     mutationFn: (type: string) =>
-      add({ data: { widget_type: type, x: 0, y: Infinity as unknown as number, w: 4, h: 4, settings: {} } as never }),
+      add({ data: { widget_type: type, x: 0, y: 999, w: 4, h: 4, settings: {} } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["widgets"] });
       toast.success("Widget added");
