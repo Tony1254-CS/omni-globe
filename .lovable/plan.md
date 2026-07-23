@@ -1,37 +1,51 @@
 
-## Problems (verified)
+# Global Time Machine — v1
 
-1. **Two "Command Center" headers.** `src/routes/_authenticated/route.tsx` wraps `<Outlet />` in `AppShell`, and most child routes (`agents`, `alerts`, `automations`, `achievements`, `devices`, `presets`, `shares`, and likely `dashboard`, `globe`, `briefing`, `history`, `settings`) ALSO wrap their content in `<AppShell>`. Result: shell + header + sidebar render twice, matching the screenshot.
-2. **Sidebar bottom cut off.** In `AppShell.tsx` the `<nav>` uses `overflow-hidden` and there is no scroll region. On a 582px-tall viewport, 12 nav items + brand + sign-out don't fit, and the user can't reach Settings / Sign out.
-3. **Cards don't feel like liquid glass.** Current `.liquid-glass` is a flat translucent panel with a static specular line. No animated blur, no gradient sheen tracking, no press state, no depth on hover.
+Turn the existing `/globe` page into a scrubbable time portal. Ships the interactive timeline, historical layers, personal milestone narration, and NASA GIBS satellite imagery. The 1‑minute cinematic video reel is a follow‑up.
 
-## Fix
+## What ships
 
-### 1. Single shell (remove duplicates)
-Remove the `<AppShell>` wrapper from every child route file under `src/routes/_authenticated/*.tsx`. Keep it only in `_authenticated/route.tsx` around `<Outlet />`. Files to edit: `dashboard.tsx`, `globe.tsx`, `briefing.tsx`, `alerts.tsx`, `automations.tsx`, `agents.tsx`, `devices.tsx`, `presets.tsx`, `shares.tsx`, `achievements.tsx`, `history.tsx`, `settings.tsx` — replace `<AppShell>…</AppShell>` with the inner content and drop the import.
+1. **Timeline scrubber** across the bottom of the globe — spans ~50 years (1975 → today) down to the day. Play/pause, speed control (1x/7x/30x/365x), and a date-picker jump. When paused the globe reflects that exact date.
+2. **Historical layers on the globe**, all wired to the date:
+   - **NASA GIBS satellite basemap** — swap the current night-lights texture for a dated true-color tile layer (MODIS Terra `CorrectedReflectance_TrueColor`, daily since 2000; night-lights fallback before 2000).
+   - **Earthquakes** — USGS historical query for that day (M4.5+), rendered as pins with magnitude-scaled glow.
+   - **ISS ground track** — for post‑1998 dates, computed from cached TLEs via `satellite.js` (already-buildable, no extra API).
+   - **News headlines** — top 5 world headlines from that day via GDELT Doc API (keyless, goes back to 2015; older dates gracefully show "no headline data").
+3. **Personal milestone overlay** — user adds milestones (birthday, graduation, wedding, etc.) in Settings. Clicking one flies the globe to that date and shows an AI‑narrated card: *"On July 4 2000, an M5.2 struck Japan, Cairo hit 32°C, and the ISS was over Madagascar."* Uses `google/gemini-3.6-flash` via the existing Lovable AI Gateway helper.
+4. **"On this day" tray** — collapsible panel showing the top event, quake, and headline for the currently selected date, so the timeline is useful without hunting on the globe.
 
-### 2. Scrollable sidebar
-In `AppShell.tsx`:
-- Change nav to `flex-1 overflow-y-auto` with thin custom scrollbar hidden until hover.
-- Add `max-h-screen` on the aside and switch `inset-y-4` layout so brand stays sticky top, sign-out sticky bottom, nav scrolls between.
-- Add a subtle top/bottom fade mask so users see there's more content.
+The video reel, causal oracle, and calendar orchestration are explicitly out of scope for this plan.
 
-### 3. True Apple-style liquid glass (widget cards)
-Rewrite `.liquid-glass` and `.widget-surface` in `src/styles.css`:
-- Layered background: base translucent tint + radial highlight in top-left + soft radial shadow in bottom-right, all in `color-mix` with the primary token.
-- `backdrop-filter: blur(40px) saturate(180%) brightness(1.05)` with a keyframed shimmer that slowly drifts the highlight (8s ease-in-out infinite, respects `prefers-reduced-motion`).
-- Border: 1px gradient border via `border-image` from `oklch(1 0 0 / .35)` to `oklch(1 0 0 / .06)`.
-- Inner shadows for the "wet glass" edge: bright inset top, dark inset bottom, plus a faint colored glow ring.
-- `.glass-specular::before` becomes a conic/linear sheen that animates position on hover (transform: translateX).
-- Hover: lift `translateY(-3px)`, boost blur to 48px, brighten border, add primary-tinted glow.
-- Active/press: `scale(0.985)` with reduced shadow — gives the "liquid settling" feel.
-- Add a `.liquid-glass-strong` variant for the sidebar/header so the whole system reads consistent.
+## How it fits the existing app
 
-Apply the same treatment to `.command-bar`, `.sidebar-rail`, and `.liquid-control` so buttons and header share the material.
+- Extends `src/routes/_authenticated/globe.tsx` + `src/components/omni/GlobeInner.tsx` — no new page.
+- Adds one table `personal_milestones` (user_id, label, occurred_at, kind) with the standard grants + RLS + `has_role`-style policies used elsewhere.
+- Adds one server-function module `src/lib/timemachine.functions.ts` (all data fetches go here so the browser never calls providers directly). Reuses the existing `provider_cache` table for GIBS availability and GDELT results, with the same 429/backoff pattern already in `widget-data.server.ts`.
+- Narration goes through the existing gateway helper (`createLovableAiGatewayProvider`) inside a server fn — no new secrets.
 
-### 4. Verify
-- `bun run build` clean.
-- Playwright screenshot of `/dashboard` at 734×582 confirming: one header only, sidebar Settings + Sign out reachable via scroll, widget cards showing the new material and hover lift.
+## Technical notes
 
-## Out of scope
-Widget data reliability, resize logic, and the 429 recovery UI already staged in `LiveWidget.tsx` — untouched this turn.
+- **GIBS tiles**: `https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/{layer}/default/{YYYY-MM-DD}/{tileMatrixSet}/{z}/{y}/{x}.jpg`. Loaded into `globe.gl` via `.globeImageUrl()` on date change; debounce swaps to avoid tile thrash while scrubbing.
+- **Timeline component**: shadcn `Slider` + a canvas density strip behind it showing quake counts per month (fetched once, cached) so the scrubber looks alive.
+- **Scrub debouncing**: while dragging, only update the "On this day" tray text; commit globe layer swaps on release or every 250ms of stillness.
+- **Graceful gaps**: GIBS MODIS starts 2000‑02‑24, GDELT 2015, USGS 1900. Each layer independently degrades and shows a small "not available before YYYY" chip.
+
+## Files touched
+
+```text
+supabase/migrations/  → personal_milestones table + grants/RLS
+src/lib/timemachine.server.ts        (new — GIBS URL builder, USGS/GDELT fetchers with cache)
+src/lib/timemachine.functions.ts     (new — server fns: getDaySnapshot, narrateMilestone, listMilestones, addMilestone, deleteMilestone)
+src/components/omni/TimelineScrubber.tsx  (new)
+src/components/omni/OnThisDayTray.tsx     (new)
+src/components/omni/MilestoneNarration.tsx (new)
+src/components/omni/GlobeInner.tsx   (edit — accept `date` prop, swap GIBS layer, filter quakes/ISS by date)
+src/routes/_authenticated/globe.tsx  (edit — timeline state, tray, milestone list)
+src/routes/_authenticated/settings.tsx (edit — Personal Milestones section)
+```
+
+## Explicit non-goals (follow-ups)
+
+- Auto-generated "Your World, Your Day" 1‑minute video reel.
+- Causal Oracle AI (Feature 2).
+- Symbiotic orchestration + Google Calendar (Feature 3).
