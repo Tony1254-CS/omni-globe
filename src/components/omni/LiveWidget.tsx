@@ -8,6 +8,7 @@ import { DEFAULT_WIDGET_SETTINGS, type WidgetSettings } from "@/lib/widget-data.
 import { updateWidgetSettings } from "@/lib/widgets.functions";
 import { scoreWidget } from "@/lib/anomaly";
 import { AttentionBadge } from "@/components/omni/AttentionBadge";
+import { TrustBadge } from "@/components/omni/TrustBadge";
 import { ForecastCard } from "@/components/omni/ForecastCard";
 import { LocationSearch } from "@/components/omni/LocationSearch";
 import { getMyProfile } from "@/lib/profile.functions";
