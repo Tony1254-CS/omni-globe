@@ -81,15 +81,15 @@ export const evaluateAlerts = createServerFn({ method: "POST" })
       .eq("enabled", true);
     if (error) throw error;
 
-    const evaluations = await evaluateAllAlerts(rows ?? []);
+    const evaluations = await evaluateAllAlerts((rows ?? []) as any);
     const nowIso = new Date().toISOString();
 
     for (const ev of evaluations) {
-      const patch: Record<string, unknown> = {
+      const patch = {
         last_checked_at: nowIso,
         last_value: ev.value ?? null,
+        ...(ev.triggered ? { last_triggered_at: nowIso } : {}),
       };
-      if (ev.triggered) patch.last_triggered_at = nowIso;
       await context.supabase.from("alerts").update(patch).eq("id", ev.id);
     }
 
