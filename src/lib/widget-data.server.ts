@@ -2,7 +2,7 @@ import type { WidgetDataResult, WidgetDataValue, WidgetSettings } from "./widget
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 // v5 rejects empty payloads and canonicalizes settings so equivalent widgets share cache.
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v6";
 
 type CacheEntry = { value?: WidgetDataResult; expiresAt: number; retryAt: number; pending?: Promise<WidgetDataResult> };
 const providerCache = new Map<string, CacheEntry>();
@@ -133,7 +133,8 @@ function hasUsableData(type: string, data: WidgetDataValue): boolean {
     case "weather": return Number.isFinite(Number(value.current?.temperature_2m));
     case "aqi": {
       const c = value.current ?? {};
-      return [c.us_aqi, c.european_aqi, c.pm2_5, c.pm10].some((v) => Number.isFinite(Number(v)));
+      const keys = ["us_aqi", "european_aqi", "primary_aqi", "pm2_5", "pm10", "nitrogen_dioxide", "ozone", "sulphur_dioxide", "carbon_monoxide"];
+      return keys.some((k) => Number.isFinite(Number(c[k])));
     }
     case "earthquakes": return Array.isArray(value.events);
     case "iss": return Number.isFinite(Number(value.position?.latitude)) && Number.isFinite(Number(value.position?.longitude));
