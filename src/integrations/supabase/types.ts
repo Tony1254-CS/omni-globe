@@ -14,6 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          code: string
+          description: string
+          icon: string
+          title: string
+        }
+        Insert: {
+          code: string
+          description: string
+          icon?: string
+          title: string
+        }
+        Update: {
+          code?: string
+          description?: string
+          icon?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      agent_runs: {
+        Row: {
+          agent_id: string
+          created_at: string
+          id: string
+          input: string
+          output: string | null
+          status: string
+          steps: Json
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          id?: string
+          input: string
+          output?: string | null
+          status?: string
+          steps?: Json
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          id?: string
+          input?: string
+          output?: string | null
+          status?: string
+          steps?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_runs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agents: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          model: string
+          name: string
+          system_prompt: string
+          tools: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          model?: string
+          name: string
+          system_prompt: string
+          tools?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          model?: string
+          name?: string
+          system_prompt?: string
+          tools?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       alerts: {
         Row: {
           comparator: string
@@ -62,6 +160,83 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_runs: {
+        Row: {
+          automation_id: string
+          created_at: string
+          detail: string | null
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          automation_id: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          automation_id?: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_runs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automations: {
+        Row: {
+          action_kind: string
+          action_params: Json
+          created_at: string
+          enabled: boolean
+          id: string
+          last_ran_at: string | null
+          name: string
+          trigger_kind: string
+          trigger_params: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_kind: string
+          action_params?: Json
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_ran_at?: string | null
+          name: string
+          trigger_kind: string
+          trigger_params?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_kind?: string
+          action_params?: Json
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_ran_at?: string | null
+          name?: string
+          trigger_kind?: string
+          trigger_params?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       briefings: {
         Row: {
           content: string
@@ -82,6 +257,101 @@ export type Database = {
           created_at?: string
           id?: string
           snapshot?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      client_errors: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          stack: string | null
+          ua: string | null
+          url: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          stack?: string | null
+          ua?: string | null
+          url?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          stack?: string | null
+          ua?: string | null
+          url?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      device_readings: {
+        Row: {
+          device_id: string
+          id: number
+          recorded_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          device_id: string
+          id?: number
+          recorded_at?: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          device_id?: string
+          id?: number
+          recorded_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_readings_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      devices: {
+        Row: {
+          created_at: string
+          device_key: string
+          hmac_secret: string
+          id: string
+          metric: string
+          name: string
+          unit: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_key: string
+          hmac_secret: string
+          id?: string
+          metric?: string
+          name: string
+          unit?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_key?: string
+          hmac_secret?: string
+          id?: string
+          metric?: string
+          name?: string
+          unit?: string | null
           user_id?: string
         }
         Relationships: []
@@ -112,6 +382,36 @@ export type Database = {
           lat?: number
           lon?: number
           sort_order?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      journal: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          kind: string
+          meta: Json
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          meta?: Json
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          meta?: Json
+          title?: string
           user_id?: string
         }
         Relationships: []
@@ -154,6 +454,80 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      provider_cache: {
+        Row: {
+          cache_key: string
+          created_at: string
+          expires_at: string
+          payload: Json
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string
+          expires_at: string
+          payload: Json
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string
+          expires_at?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
+      shared_dashboards: {
+        Row: {
+          created_at: string
+          id: string
+          slug: string
+          snapshot: Json
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          slug: string
+          snapshot: Json
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          slug?: string
+          snapshot?: Json
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_achievements: {
+        Row: {
+          code: string
+          unlocked_at: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          unlocked_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          unlocked_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_code_fkey"
+            columns: ["code"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       user_roles: {
         Row: {
