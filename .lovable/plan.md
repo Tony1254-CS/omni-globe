@@ -1,35 +1,75 @@
-## History repair plan
+# OmniSphere → Making It Unforgettable
 
-### 1. Make the controls reliable
-- Move dataset, date range, coordinates, coin, and magnitude into validated URL search parameters so selections persist and navigation/refetches are deterministic.
-- Replace continuous requests while dragging/typing with draft controls plus an explicit **Apply** action; show a clear updating state and disable Apply until values change.
-- Validate latitude, longitude, coin ID, magnitude, and date range; add **Reset** and retry behavior.
+Acting as senior researcher/strategist. You already have the "wow" surface (globe, widgets, oracle, time machine, agents). What's missing is a **narrative spine** — one thing people tell their friends about. Below are the features that would move OmniSphere from "impressive demo" to "I need this in my life," ranked by memorability × usefulness × feasibility on your current stack.
 
-### 2. Add actual personal history
-- Add an authenticated history server function that reads the signed-in user’s existing records from:
-  - alert triggers/checks
-  - automation runs
-  - AI agent runs
-  - device readings
-  - journal entries
-  - personal milestones
-  - widget creation/updates
-- Normalize these records into a chronological activity feed with category filters, date range, status, title, summary, and timestamp.
-- Keep all reads user-scoped through the existing authenticated backend and row-level access rules; no schema change is required.
+---
 
-### 3. Rebuild the History screen
-- Add two clear views:
-  - **My Activity** — real personal timeline with summary counters and useful empty states.
-  - **Global Trends** — existing weather, crypto, and earthquake charts with repaired controls.
-- Use distinct timeline/event visuals by category instead of presenting every record identically.
-- Keep charts responsive and display the active source, selected range, point count, and last refresh time.
+## Tier S — The Signature Feature (pick ONE, build it deep)
 
-### 4. Harden external trend data
-- Validate provider payloads before rendering.
-- Add bounded caching and graceful fallback/error states so one unavailable provider does not make the whole History page appear broken.
-- Ensure weather, crypto, and earthquake requests use the applied control values and visibly update the chart/source metadata.
+These are the "headline" moves. A project is remembered for one thing, not twenty.
 
-### 5. Verify end to end
-- Test all three global datasets with changed controls and confirm the plotted data/request parameters change.
-- Test personal history with available user records and confirm filters/date range work.
-- Verify loading, empty, provider-error, retry, desktop, and current mobile viewport states.
+### 1. **"Pulse" — Your Personal World State, in 10 seconds/day**
+A single, cinematic morning card that fuses everything OmniSphere already knows:
+- Your city's air/weather/quake risk + your calendar + markets you follow + one global event that matters to *you specifically* + one anomaly Oracle detected overnight.
+- Delivered as: (a) a 15-second auto-generated **animated globe flyover video** with AI voice-over, (b) a shareable "Pulse card" image (like Spotify Wrapped, daily).
+- **Why it wins:** it's the *reason to open the app*. Everything else becomes supporting infra. Shareable Pulse cards = organic growth loop.
+
+### 2. **"Foresight" — Probabilistic Future Feed**
+Not headlines. *Predictions with confidence bars.* Powered by Oracle + your data:
+- "72% chance of thunderstorm disruption to your 6pm flight" · "BTC volatility spike expected in 48h (based on 3 correlated signals)" · "Earthquake swarm pattern near Istanbul — historical precedent for M5+ in next 14 days."
+- Each prediction is **auditable**: click to see the causal graph, the data sources, and the historical hit-rate of similar predictions.
+- **Why it wins:** nobody else does calibrated, explainable predictions in a consumer product. This is the "brain" people will screenshot.
+
+### 3. **"Rewind Reels" — Time Machine as TikTok**
+Extend Time Machine: pick any date + location → auto-generate a 30-second vertical video: satellite zoom, headline crawl, market ticker, weather timelapse, your milestone overlay, AI narration. One-tap export.
+- **Why it wins:** birthdays, anniversaries, "the day I was born" → viral gift mechanic.
+
+---
+
+## Tier A — Depth features (make existing surfaces feel bottomless)
+
+4. **Signal Composer** — drag any two widgets onto each other → Oracle finds the correlation, plots it, and offers to create an alert. ("Bitcoin vs. Tokyo earthquakes over 5 years" — instant chart + causal read.)
+5. **Ambient Mode** — full-screen "living wallpaper" of your globe with rotating widgets. Runs on a spare monitor / TV. Zero interaction. This is what people leave running → daily habit lock-in.
+6. **Trust Layer** — every data point shows source, freshness, and a confidence score. Every AI answer cites. This is the *credibility differentiator* vs. ChatGPT-with-a-globe clones.
+7. **"Watchlists"** — first-class objects (a city, a stock, a person, a satellite, a volcano). Follow one → all relevant widgets/oracle/alerts auto-configure. Solves the "empty dashboard" problem for new users.
+
+---
+
+## Tier B — Growth & stickiness
+
+8. **Public Explorer pages** — SEO-indexed pages per city/asset/event ("omnisphere.app/tokyo", "/btc", "/m6.2-turkey-2025"). Rich OG cards. Organic traffic + backlinks.
+9. **Weekly Digest email** — auto-generated recap of your world. Retention.
+10. **Embed widgets** — one line `<iframe>` to drop any OmniSphere widget into a blog/Notion. Viral distribution.
+
+---
+
+## What I'd cut / de-prioritize
+- More widgets. You have enough. Depth beats breadth now.
+- IoT/devices for consumer launch — niche, keep as B2B story.
+- Gamification/achievements — cheapens the "premium serious tool" positioning.
+
+---
+
+## My recommendation
+
+**Build Tier S #1 (Pulse) + #2 (Foresight) + Tier A #6 (Trust Layer).**
+
+That combo gives you:
+- A daily reason to open (Pulse)
+- A defensible intellectual moat (Foresight w/ calibration)
+- The credibility to be taken seriously (Trust)
+
+Everything else you already built becomes the *supporting universe* those three features draw from. That's the story: **"OmniSphere gives you a calibrated, cited, cinematic read on your world every morning."**
+
+---
+
+## Question before I plan the build
+
+Which of these should I turn into an actual implementation plan?
+- **A)** Pulse (daily cinematic briefing + shareable card) — highest wow, ~1 build phase
+- **B)** Foresight (probabilistic predictions with audit trail) — highest defensibility, ~2 phases
+- **C)** Rewind Reels (Time Machine → shareable video) — highest virality, ~1 phase
+- **D)** All three sequenced (Pulse → Foresight → Reels) — full signature arc
+- **E)** Something else from Tier A/B, or your own idea
+
+Tell me the letter (or mix) and I'll come back with a concrete, phased build plan against your current stack.
