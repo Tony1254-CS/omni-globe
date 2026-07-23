@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      alerts: {
+        Row: {
+          comparator: string
+          created_at: string
+          enabled: boolean
+          id: string
+          kind: string
+          label: string
+          last_checked_at: string | null
+          last_triggered_at: string | null
+          last_value: number | null
+          params: Json
+          threshold: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comparator: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          kind: string
+          label: string
+          last_checked_at?: string | null
+          last_triggered_at?: string | null
+          last_value?: number | null
+          params?: Json
+          threshold: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comparator?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          kind?: string
+          label?: string
+          last_checked_at?: string | null
+          last_triggered_at?: string | null
+          last_value?: number | null
+          params?: Json
+          threshold?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       favourite_locations: {
         Row: {
           created_at: string
