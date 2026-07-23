@@ -61,9 +61,9 @@ export async function fetchWidgetData(type: string, settings: WidgetSettings): P
       return result(type, "Where The ISS At", { position, crew });
     }
     case "spacex": {
-      const launches = await json("https://api.spacexdata.com/v5/launches/upcoming");
-      const next = launches.sort((a: any, b: any) => Date.parse(a.date_utc) - Date.parse(b.date_utc))[0];
-      return result(type, "SpaceX API", next ?? null);
+      const data = await json("https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=10");
+      const next = (data.results ?? []).find((launch: any) => /spacex/i.test(`${launch.launch_service_provider?.name ?? ""} ${launch.name ?? ""}`)) ?? data.results?.[0];
+      return result(type, "Launch Library 2", next ?? null);
     }
     case "apod": {
       const key = process.env.NASA_API_KEY || "DEMO_KEY";
