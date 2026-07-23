@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Activity, Cloud, Coins, ExternalLink, Github, Globe2, MessageSquare, Newspaper, Orbit, RefreshCw, Rocket, Save, Satellite, Settings2, TrendingDown, TrendingUp, Wind, type LucideIcon } from "lucide-react";
+import { Activity, Clock, Cloud, Coins, ExternalLink, Github, Globe2, Heart, MessageSquare, Newspaper, Orbit, RefreshCw, Rocket, Save, Satellite, Settings2, TrendingDown, TrendingUp, Wind, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { getWidgetData } from "@/lib/widget-data.functions";
@@ -12,10 +12,12 @@ import { TrustBadge } from "@/components/omni/TrustBadge";
 import { ForecastCard } from "@/components/omni/ForecastCard";
 import { LocationSearch } from "@/components/omni/LocationSearch";
 import { getMyProfile } from "@/lib/profile.functions";
+import { formatInTz, formatTimeInTz, cToF, kmhToMph, countryFromTz } from "@/lib/format";
 
 type Props = { id: string; type: string; settings: unknown };
 
 const FORECASTABLE = new Set(["weather", "aqi", "earthquakes", "crypto"]);
+const LOCATION_AWARE = new Set(["weather", "aqi", "news", "clocks"]);
 const WIDGET_STATES: Record<string, { icon: LucideIcon; unavailable: string; hint: string }> = {
   weather: { icon: Cloud, unavailable: "Weather signal interrupted", hint: "Keeping your last forecast ready" },
   aqi: { icon: Wind, unavailable: "Air sensor network paused", hint: "Air readings will resume automatically" },
@@ -31,13 +33,15 @@ const WIDGET_STATES: Record<string, { icon: LucideIcon; unavailable: string; hin
   fx: { icon: Coins, unavailable: "Currency market unavailable", hint: "Exchange rates will refresh automatically" },
   countries: { icon: Globe2, unavailable: "Country data unavailable", hint: "The atlas service will retry shortly" },
   github: { icon: Github, unavailable: "Repository feed paused", hint: "Reconnecting to GitHub trends" },
+  clocks: { icon: Clock, unavailable: "World clock unavailable", hint: "The clock will resume shortly" },
+  quote: { icon: Heart, unavailable: "Quote of the day paused", hint: "A fresh quote will arrive soon" },
+  covid: { icon: Activity, unavailable: "Health dataset unavailable", hint: "The provider will retry automatically" },
 };
 
 const asSettings = (value: unknown): WidgetSettings =>
   value && typeof value === "object" && !Array.isArray(value) ? value as WidgetSettings : {};
 
 const num = (value: unknown, digits = 0) => Number(value ?? 0).toLocaleString(undefined, { maximumFractionDigits: digits });
-const date = (value: unknown) => value ? new Date(value as string | number).toLocaleString() : "—";
 const linkClass = "inline-flex items-center gap-1 text-primary hover:underline";
 
 export function LiveWidget({ id, type, settings: stored }: Props) {
@@ -46,13 +50,27 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
   const fetchProfile = useServerFn(getMyProfile);
   const saveSettings = useServerFn(updateWidgetSettings);
   const baseSettings = useMemo(() => ({ ...(DEFAULT_WIDGET_SETTINGS[type] ?? {}), ...asSettings(stored) }), [stored, type]);
-  const profile = useQuery({ queryKey: ["profile"], queryFn: () => fetchProfile(), enabled: type === "weather" || type === "aqi", staleTime: 5 * 60_000 });
+  const profileEnabled = LOCATION_AWARE.has(type);
+  const profile = useQuery({ queryKey: ["profile"], queryFn: () => fetchProfile(), enabled: profileEnabled, staleTime: 5 * 60_000 });
+  const usingGlobal = profileEnabled && baseSettings.useGlobalLocation !== false && !!profile.data;
   const settings = useMemo(() => {
-    if ((type === "weather" || type === "aqi") && baseSettings.useGlobalLocation !== false && profile.data?.home_lat != null && profile.data?.home_lon != null) {
-      return { ...baseSettings, lat: profile.data.home_lat, lon: profile.data.home_lon, label: profile.data.home_label ?? "Home" };
+    if (!usingGlobal || !profile.data) return baseSettings;
+    const merged: WidgetSettings = { ...baseSettings };
+    if (profile.data.home_lat != null && profile.data.home_lon != null) {
+      merged.lat = profile.data.home_lat;
+      merged.lon = profile.data.home_lon;
+      merged.label = profile.data.home_label ?? "Home";
     }
-    return baseSettings;
-  }, [baseSettings, profile.data, type]);
+    const tz = profile.data.timezone;
+    if (type === "clocks" && tz) {
+      const existing = String(baseSettings.zones ?? "").split(",").map((z) => z.trim()).filter(Boolean).filter((z) => z !== tz);
+      merged.zones = [tz, ...existing].slice(0, 6).join(",");
+    }
+    if (type === "news" && tz) merged.country = countryFromTz(tz);
+    return merged;
+  }, [baseSettings, profile.data, type, usingGlobal]);
+  const profileTz = profile.data?.timezone ?? undefined;
+  const units = (profile.data?.units as "metric" | "imperial") ?? "metric";
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(settings);
   useEffect(() => setDraft(settings), [settings]);
@@ -60,8 +78,8 @@ export function LiveWidget({ id, type, settings: stored }: Props) {
   const query = useQuery({
     queryKey: ["widget-data", id, type, settings],
     queryFn: () => fetchData({ data: { type, settings } }),
-    staleTime: type === "iss" ? 15_000 : 5 * 60_000,
-    refetchInterval: type === "iss" ? 20_000 : false,
+    staleTime: type === "iss" ? 15_000 : type === "crypto" ? 60_000 : 5 * 60_000,
+    refetchInterval: type === "iss" ? 20_000 : type === "crypto" ? 60_000 : type === "fx" ? 5 * 60_000 : false,
     retry: 1,
   });
 
