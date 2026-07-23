@@ -24,7 +24,7 @@ export const WIDGET_CATALOG: readonly WidgetMeta[] = [
   { type: "neo",           label: "Near-Earth Objects",icon: Activity,     category: "Space",   description: "Upcoming asteroid approaches" },
   { type: "clocks",        label: "World Clocks",      icon: Clock,        category: "Culture", description: "Multiple timezones, analogue/digital" },
   { type: "news",          label: "News",              icon: Newspaper,    category: "News",    description: "Top headlines & keyword filter" },
-  { type: "reddit",        label: "Reddit",            icon: MessageSquare,category: "News",    description: "Hot posts from any subreddit" },
+  { type: "reddit",        label: "Community News",    icon: MessageSquare,category: "News",    description: "Popular discussions by topic" },
   { type: "crypto",        label: "Crypto Ticker",     icon: Coins,        category: "Finance", description: "Live prices + 24h sparkline" },
   { type: "fx",            label: "Currency",          icon: TrendingUp,   category: "Finance", description: "160+ currency converter" },
   { type: "countries",     label: "Country Explorer",  icon: Globe2,       category: "Culture", description: "Random country: flag, capital, map" },

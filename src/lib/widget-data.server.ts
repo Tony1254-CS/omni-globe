@@ -1,8 +1,8 @@
 import type { WidgetDataResult, WidgetDataValue, WidgetSettings } from "./widget-data.types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-// v4: cache-key bump — invalidates all stale/error rows from prior versions
-const CACHE_VERSION = "v4";
+// v5 rejects empty payloads and canonicalizes settings so equivalent widgets share cache.
+const CACHE_VERSION = "v5";
 
 type CacheEntry = { value?: WidgetDataResult; expiresAt: number; retryAt: number; pending?: Promise<WidgetDataResult> };
 const providerCache = new Map<string, CacheEntry>();
@@ -73,6 +73,8 @@ function decodeXml(value: string) {
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&nbsp;/g, " ")
     .trim();
 }
 
@@ -105,7 +107,48 @@ function issPositionFromElements(element: Record<string, unknown>, at = new Date
   return { latitude: Math.asin(z / radius) * 180 / Math.PI, longitude: wrappedLongitude, altitude: radius - 6371, velocity: meanMotion * 2 * Math.PI * semiMajorAxis / 24 };
 }
 
-const stableSettings = (settings: WidgetSettings) => Object.fromEntries(Object.entries(settings).sort(([a], [b]) => a.localeCompare(b)));
+function cacheSettings(type: string, settings: WidgetSettings): WidgetSettings {
+  const relevant: Record<string, string[]> = {
+    weather: ["lat", "lon"], aqi: ["lat", "lon"], earthquakes: ["minMagnitude"],
+    mars: ["rover"], news: ["query"], reddit: ["subreddit"], crypto: ["coins"],
+    fx: ["amount", "base", "quote"], countries: ["country"], github: ["language"],
+    covid: ["country"], clocks: ["zones"],
+  };
+  const keys = relevant[type] ?? [];
+  const normalized = Object.fromEntries(keys.flatMap((key) => settings[key] == null ? [] : [[key, settings[key]]])) as WidgetSettings;
+  if (typeof normalized.lat === "number") normalized.lat = Number(normalized.lat.toFixed(3));
+  if (typeof normalized.lon === "number") normalized.lon = Number(normalized.lon.toFixed(3));
+  return Object.fromEntries(Object.entries(normalized).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+const cacheKeyFor = (type: string, settings: WidgetSettings) =>
+  `${CACHE_VERSION}:${type}:${JSON.stringify(cacheSettings(type, settings))}`;
+
+function hasUsableData(type: string, data: WidgetDataValue): boolean {
+  if (data == null) return false;
+  if (Array.isArray(data)) return data.length > 0;
+  if (typeof data !== "object") return true;
+  const value = data as Record<string, any>;
+  switch (type) {
+    case "weather": return Number.isFinite(Number(value.current?.temperature_2m));
+    case "aqi": return Number.isFinite(Number(value.current?.us_aqi ?? value.current?.pm2_5));
+    case "earthquakes": return Array.isArray(value.events);
+    case "iss": return Number.isFinite(Number(value.position?.latitude)) && Number.isFinite(Number(value.position?.longitude));
+    case "spacex": return Boolean(value.name && (value.net || value.date));
+    case "apod": return Boolean(value.title && (value.url || value.thumbnail_url));
+    case "mars": return Array.isArray(value.photos) && value.photos.length > 0;
+    case "news": return Array.isArray(value.items) && value.items.length > 0;
+    case "reddit": return Array.isArray(value.posts) && value.posts.length > 0;
+    case "crypto": return Object.keys(value).length > 0;
+    case "github": return Array.isArray(value.items) && value.items.length > 0;
+    default: return Object.keys(value).length > 0;
+  }
+}
+
+function assertUsable(resultValue: WidgetDataResult): WidgetDataResult {
+  if (!hasUsableData(resultValue.type, resultValue.data)) throw new ProviderError(`${resultValue.source} returned no usable data`, 503);
+  return resultValue;
+}
 
 /**
  * Read-through, always-serve-stale cache.
@@ -115,7 +158,7 @@ const stableSettings = (settings: WidgetSettings) => Object.fromEntries(Object.e
  *   throttle retries, but NEVER lock the user out for 30 min like the old code.
  */
 export async function fetchWidgetData(type: string, settings: WidgetSettings): Promise<WidgetDataResult> {
-  const cacheKey = `${CACHE_VERSION}:${type}:${JSON.stringify(stableSettings(settings))}`;
+  const cacheKey = cacheKeyFor(type, settings);
   const now = Date.now();
   let cached = providerCache.get(cacheKey);
 
@@ -154,7 +197,7 @@ export async function fetchWidgetData(type: string, settings: WidgetSettings): P
 
 async function refresh(type: string, settings: WidgetSettings, cacheKey: string): Promise<WidgetDataResult> {
   try {
-    const value = await fetchWidgetDataFresh(type, settings);
+    const value = assertUsable(await fetchWidgetDataFresh(type, settings));
     const expiresAt = Date.now() + (CACHE_TTL[type] ?? 5 * 60_000);
     const liveValue: WidgetDataResult = { ...value, status: "live" };
     providerCache.set(cacheKey, { value: liveValue, expiresAt, retryAt: 0 });
@@ -190,8 +233,15 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
       }
     }
     case "aqi": {
-      const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5,nitrogen_dioxide,ozone&timezone=auto`);
-      return result(type, "Open-Meteo Air Quality", { label: text(settings.label, "Selected location"), ...data });
+      try {
+        const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5,nitrogen_dioxide,ozone&timezone=auto`);
+        return result(type, "Open-Meteo Air Quality", { label: text(settings.label, "Selected location"), ...data });
+      } catch {
+        const data = await json(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=us_aqi,pm10,pm2_5,nitrogen_dioxide,ozone&past_days=1&forecast_days=1&timezone=auto`);
+        const index = Math.max(0, (data.hourly?.time?.length ?? 1) - 1);
+        const current = Object.fromEntries(["us_aqi", "pm10", "pm2_5", "nitrogen_dioxide", "ozone"].map((key) => [key, data.hourly?.[key]?.[index]]));
+        return result(type, "Open-Meteo Air Quality · latest hourly", { label: text(settings.label, "Selected location"), current });
+      }
     }
     case "earthquakes": {
       const min = Math.max(0, Math.min(10, number(settings.minMagnitude, 2.5)));
@@ -217,11 +267,13 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
       try {
         const data = await json("https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=10");
         const next = (data.results ?? []).find((launch: any) => /spacex/i.test(`${launch.launch_service_provider?.name ?? ""} ${launch.name ?? ""}`)) ?? data.results?.[0];
-        return result(type, "Launch Library 2", next ?? null);
+        if (!next?.name || !next?.net) throw new Error("Upcoming launch missing");
+        return result(type, "Launch Library 2", next);
       } catch {
         const launches = await json("https://fdo.rocketlaunch.live/json/launches/next/5");
         const next = (launches.result ?? []).find((launch: any) => /spacex/i.test(launch.provider?.name ?? "")) ?? launches.result?.[0];
-        return result(type, "RocketLaunch.Live", next ? { name: next.name, net: next.t0 ?? next.win_open, mission: { description: next.mission_description ?? next.launch_description }, status: { description: next.launch_description } } : null);
+        if (!next?.name || !(next.t0 || next.win_open || next.sort_date)) throw new Error("Upcoming launch missing");
+        return result(type, "RocketLaunch.Live", { name: next.name, net: next.t0 ?? next.win_open ?? Number(next.sort_date) * 1000, mission: { description: next.mission_description ?? next.launch_description }, status: { description: next.launch_description } });
       }
     }
     case "apod": {
@@ -252,9 +304,21 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
     case "neo": {
       const key = process.env.NASA_API_KEY || "DEMO_KEY";
       const start = new Date().toISOString().slice(0, 10);
-      const data = await json(`https://api.nasa.gov/neo/rest/v1/feed?start_date=${start}&api_key=${encodeURIComponent(key)}`);
-      const objects = Object.values(data.near_earth_objects ?? {}).flat().slice(0, 12);
-      return result(type, "NASA", objects as WidgetDataValue);
+      try {
+        const data = await json(`https://api.nasa.gov/neo/rest/v1/feed?start_date=${start}&api_key=${encodeURIComponent(key)}`);
+        const objects = Object.values(data.near_earth_objects ?? {}).flat().slice(0, 12);
+        if (!objects.length) throw new Error("NEO feed empty");
+        return result(type, "NASA", objects as WidgetDataValue);
+      } catch {
+        const data = await json("https://ssd-api.jpl.nasa.gov/cad.api?dist-max=0.2&date-min=now&date-max=%2B30&sort=date&limit=12");
+        const fields: string[] = data.fields ?? [];
+        const row = (values: unknown[]) => Object.fromEntries(fields.map((field, index) => [field, values[index]]));
+        const objects = (data.data ?? []).map(row).map((object: any) => ({
+          name: object.des, close_approach_data: [{ close_approach_date_full: object.cd, miss_distance: { astronomical: object.dist }, relative_velocity: { kilometers_per_second: object.v_rel } }],
+          estimated_diameter: { meters: { estimated_diameter_max: Math.round(1329 / Math.sqrt(0.14) * 10 ** (-Number(object.h) / 5) * 1000) } }, is_potentially_hazardous_asteroid: Number(object.dist) < 0.05,
+        }));
+        return result(type, "NASA/JPL Close Approach", objects);
+      }
     }
     case "clocks": {
       const zones = text(settings.zones, "UTC,America/New_York,Asia/Tokyo").split(",").map((z) => z.trim()).filter(Boolean).slice(0, 6);
@@ -276,13 +340,13 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
         if (!items.length) throw new Error("News feed empty");
         return result(type, "Google News", { query, items });
       } catch {
-        // Fallback: Hacker News Algolia search — no key, extremely reliable
-        const hn = await json(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=10`);
-        const items = (hn.hits ?? []).map((h: any) => ({
-          title: h.title || h.story_title, link: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
-          published: h.created_at, source: "Hacker News",
-        })).filter((i: any) => i.title);
-        return result(type, "Hacker News", { query, items });
+        const xml = await feed("https://feeds.bbci.co.uk/news/world/rss.xml");
+        const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 10).map((match) => {
+          const block = match[1];
+          const field = (name: string) => decodeXml(block.match(new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`))?.[1] ?? "");
+          return { title: field("title"), link: field("link"), published: field("pubDate"), source: "BBC World" };
+        });
+        return result(type, "BBC World", { query, items });
       }
     }
     case "reddit": {
@@ -300,7 +364,7 @@ async function fetchWidgetDataFresh(type: string, settings: WidgetSettings): Pro
         score: h.points, comments: h.num_comments,
         url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
       })).filter((p: any) => p.title);
-      return result(type, `Hacker News · ${query}`, { subreddit, posts });
+      return result(type, `Community News · ${query}`, { subreddit, posts });
     }
     case "crypto": {
       const coins = text(settings.coins, "bitcoin,ethereum,solana").toLowerCase().replace(/[^a-z0-9,-]/g, "").slice(0, 100);
@@ -372,10 +436,10 @@ export const GLOBAL_WARMUP_WIDGETS: Array<{ type: string; settings: WidgetSettin
 export async function warmAllProviders() {
   const results: Array<{ type: string; ok: boolean; source?: string; error?: string }> = [];
   await Promise.all(GLOBAL_WARMUP_WIDGETS.map(async ({ type, settings }) => {
-    const cacheKey = `${CACHE_VERSION}:${type}:${JSON.stringify(stableSettings(settings))}`;
+    const cacheKey = cacheKeyFor(type, settings);
     try {
       // Force a refresh path regardless of current cache state.
-      const value = await fetchWidgetDataFresh(type, settings);
+      const value = assertUsable(await fetchWidgetDataFresh(type, settings));
       const expiresAt = Date.now() + (CACHE_TTL[type] ?? 5 * 60_000);
       const liveValue: WidgetDataResult = { ...value, status: "live" };
       providerCache.set(cacheKey, { value: liveValue, expiresAt, retryAt: 0 });
