@@ -3,17 +3,19 @@ import type { ReactNode } from "react";
 
 export function WidgetShell({
   title,
+  type,
   onRemove,
   removeIcon,
   children,
 }: {
   title: string;
+  type: string;
   onRemove?: () => void;
   removeIcon?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="liquid-glass widget-surface relative flex h-full flex-col overflow-hidden">
+    <div className="liquid-glass widget-surface relative flex h-full flex-col overflow-hidden" data-widget={type}>
       <div className="glass-specular" aria-hidden="true" />
       <div className="widget-handle flex cursor-grab items-center justify-between border-b border-glass-border px-3 py-2 active:cursor-grabbing">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -30,7 +32,7 @@ export function WidgetShell({
           </button>
         )}
       </div>
-      <div className="relative z-[1] flex-1 overflow-auto p-4">{children}</div>
+      <div className="relative z-[1] min-h-0 flex-1 overflow-hidden p-4">{children}</div>
     </div>
   );
 }

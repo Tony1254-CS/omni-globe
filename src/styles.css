@@ -228,7 +228,6 @@
   border: 1px solid transparent;
   background-clip: padding-box;
   backdrop-filter: blur(38px) saturate(180%) brightness(1.04);
-  -webkit-backdrop-filter: blur(38px) saturate(180%) brightness(1.04);
   box-shadow:
     0 1px 0 oklch(1 0 0 / 0.28) inset,
     0 -1px 0 oklch(0 0 0 / 0.32) inset,
@@ -238,21 +237,53 @@
 }
 
 .widget-surface {
+  --widget-accent: var(--primary);
   transition:
     transform 480ms cubic-bezier(.22,1,.36,1),
     box-shadow 480ms cubic-bezier(.22,1,.36,1),
     backdrop-filter 320ms ease,
     border-color 280ms ease;
 }
+.widget-surface[data-widget="weather"], .widget-surface[data-widget="aqi"] { --widget-accent: var(--neon-cyan); }
+.widget-surface[data-widget="earthquakes"], .widget-surface[data-widget="neo"] { --widget-accent: var(--neon-amber); }
+.widget-surface[data-widget="reddit"], .widget-surface[data-widget="news"] { --widget-accent: var(--neon-magenta); }
+.widget-surface[data-widget="crypto"], .widget-surface[data-widget="fx"] { --widget-accent: var(--neon-lime); }
+.widget-surface[data-widget="iss"], .widget-surface[data-widget="spacex"], .widget-surface[data-widget="apod"], .widget-surface[data-widget="mars"] { --widget-accent: var(--chart-5); }
+.widget-surface::after {
+  content: "";
+  position: absolute;
+  inset: auto 12% -55% 12%;
+  height: 58%;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--widget-accent) 13%, transparent);
+  filter: blur(34px);
+  pointer-events: none;
+}
+.widget-state-icon {
+  color: var(--widget-accent);
+  background: color-mix(in oklab, var(--widget-accent) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--widget-accent) 24%, var(--glass-border));
+  box-shadow: 0 1px 0 oklch(1 0 0 / .16) inset, 0 12px 28px -18px var(--widget-accent);
+}
+.widget-content { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--widget-accent) 30%, transparent) transparent; }
+.widget-content::-webkit-scrollbar { width: 4px; }
+.widget-content::-webkit-scrollbar-track { background: transparent; }
+.widget-content::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--widget-accent) 28%, transparent); border-radius: 99px; }
+.widget-skeleton > * {
+  background: linear-gradient(105deg, color-mix(in oklab, var(--foreground) 4%, transparent) 30%, color-mix(in oklab, var(--widget-accent) 12%, transparent) 48%, color-mix(in oklab, var(--foreground) 4%, transparent) 66%);
+  background-size: 240% 100%;
+  animation: widget-shimmer 1.8s ease-in-out infinite;
+}
+@keyframes widget-shimmer { to { background-position: -180% 0; } }
 .widget-surface:hover {
   transform: translateY(-3px);
   backdrop-filter: blur(46px) saturate(190%) brightness(1.07);
   box-shadow:
     0 1px 0 oklch(1 0 0 / 0.34) inset,
     0 -1px 0 oklch(0 0 0 / 0.32) inset,
-    0 0 0 1px color-mix(in oklab, var(--primary) 30%, transparent) inset,
+    0 0 0 1px color-mix(in oklab, var(--widget-accent) 30%, transparent) inset,
     0 44px 100px -42px oklch(0 0 0 / 0.95),
-    0 0 60px color-mix(in oklab, var(--primary) 18%, transparent);
+    0 0 60px color-mix(in oklab, var(--widget-accent) 18%, transparent);
 }
 .widget-surface:active {
   transform: translateY(-1px) scale(0.995);
@@ -331,7 +362,6 @@
     linear-gradient(180deg, color-mix(in oklab, var(--glass-bg) 96%, white 3%), color-mix(in oklab, var(--glass-bg) 86%, transparent));
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
   box-shadow:
     0 1px 0 oklch(1 0 0 / 0.22) inset,
     0 0 0 1px color-mix(in oklab, white 10%, transparent) inset,
@@ -343,9 +373,7 @@
 /* Sidebar scroll region — hides scrollbar until hover, fades top/bottom edges */
 .sidebar-scroll {
   scrollbar-width: none;
-  -ms-overflow-style: none;
   mask-image: linear-gradient(180deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
 }
 .sidebar-scroll::-webkit-scrollbar { width: 0; height: 0; }
 .sidebar-rail[data-expanded="true"] .sidebar-scroll { scrollbar-width: thin; }
@@ -376,7 +404,6 @@
     linear-gradient(145deg, color-mix(in oklab, var(--glass-bg) 96%, white 3%), color-mix(in oklab, var(--glass-bg) 88%, transparent));
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(34px) saturate(180%);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
   box-shadow:
     0 1px 0 oklch(1 0 0 / .24) inset,
     0 -1px 0 oklch(0 0 0 / .22) inset,
