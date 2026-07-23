@@ -3,7 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/public/hooks/refresh-widgets")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const suppliedKey = request.headers.get("apikey");
+        const expectedKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+        if (!expectedKey || suppliedKey !== expectedKey) return new Response("Unauthorized", { status: 401 });
         const { warmAllProviders } = await import("@/lib/widget-data.server");
         const results = await warmAllProviders();
         return Response.json({
