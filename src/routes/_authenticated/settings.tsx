@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { Loader2, MapPin, Plus, Trash2 } from "lucide-react";
+import { Loader2, MapPin, Plus, Trash2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { LocationSearch } from "@/components/omni/LocationSearch";
 
@@ -12,6 +12,7 @@ import {
   deleteFavourite,
   listFavourites,
 } from "@/lib/favourites.functions";
+import { addMilestone, deleteMilestone, listMilestones } from "@/lib/timemachine.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
