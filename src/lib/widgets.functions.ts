@@ -65,6 +65,23 @@ export const saveLayout = createServerFn({ method: "POST" })
     return { ok: true, count: data.items.length };
   });
 
+export const updateWidgetSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    id: z.string().uuid(),
+    settings: z.record(z.string().max(60), jsonSchema),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("widget_configs")
+      .update({ settings: data.settings })
+      .eq("id", data.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return row;
+  });
+
 export const deleteWidget = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
