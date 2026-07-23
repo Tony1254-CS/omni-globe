@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, Trash2, Loader2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -129,22 +129,20 @@ function Dashboard() {
             layoutMut.mutate(next.map((n) => ({ id: n.i, x: n.x, y: n.y, w: n.w, h: n.h })));
           }}
         >
-          <AnimatePresence>
-            {widgets.map((w) => {
-              const meta = WIDGET_CATALOG.find((c) => c.type === w.widget_type);
-              return (
-                <div key={w.id} data-grid={{ i: w.id, x: w.x, y: w.y, w: w.w, h: w.h }}>
-                  <WidgetShell
-                    title={meta?.label ?? w.widget_type}
-                    onRemove={() => delMut.mutate(w.id)}
-                    removeIcon={<Trash2 className="h-3.5 w-3.5" />}
-                  >
-                    <LiveWidget id={w.id} type={w.widget_type} settings={w.settings} />
-                  </WidgetShell>
-                </div>
-              );
-            })}
-          </AnimatePresence>
+          {widgets.map((w) => {
+            const meta = WIDGET_CATALOG.find((c) => c.type === w.widget_type);
+            return (
+              <div key={w.id} data-grid={{ i: w.id, x: w.x, y: w.y, w: w.w, h: w.h }}>
+                <WidgetShell
+                  title={meta?.label ?? w.widget_type}
+                  onRemove={() => delMut.mutate(w.id)}
+                  removeIcon={<Trash2 className="h-3.5 w-3.5" />}
+                >
+                  <LiveWidget id={w.id} type={w.widget_type} settings={w.settings} />
+                </WidgetShell>
+              </div>
+            );
+          })}
         </LayoutGrid>
       )}
 
