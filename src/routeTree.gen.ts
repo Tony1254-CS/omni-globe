@@ -15,10 +15,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as AuthenticatedSharesRouteImport } from './routes/_authenticated/shares'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedPulseRouteImport } from './routes/_authenticated/pulse'
 import { Route as AuthenticatedPresetsRouteImport } from './routes/_authenticated/presets'
 import { Route as AuthenticatedOracleRouteImport } from './routes/_authenticated/oracle'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedGlobeRouteImport } from './routes/_authenticated/globe'
+import { Route as AuthenticatedForesightRouteImport } from './routes/_authenticated/foresight'
 import { Route as AuthenticatedDevicesRouteImport } from './routes/_authenticated/devices'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedBriefingRouteImport } from './routes/_authenticated/briefing'
@@ -59,6 +61,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPulseRoute = AuthenticatedPulseRouteImport.update({
+  id: '/pulse',
+  path: '/pulse',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPresetsRoute = AuthenticatedPresetsRouteImport.update({
   id: '/presets',
   path: '/presets',
@@ -77,6 +84,11 @@ const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
 const AuthenticatedGlobeRoute = AuthenticatedGlobeRouteImport.update({
   id: '/globe',
   path: '/globe',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedForesightRoute = AuthenticatedForesightRouteImport.update({
+  id: '/foresight',
+  path: '/foresight',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDevicesRoute = AuthenticatedDevicesRouteImport.update({
@@ -145,10 +157,12 @@ export interface FileRoutesByFullPath {
   '/briefing': typeof AuthenticatedBriefingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/devices': typeof AuthenticatedDevicesRoute
+  '/foresight': typeof AuthenticatedForesightRoute
   '/globe': typeof AuthenticatedGlobeRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/oracle': typeof AuthenticatedOracleRoute
   '/presets': typeof AuthenticatedPresetsRoute
+  '/pulse': typeof AuthenticatedPulseRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shares': typeof AuthenticatedSharesRoute
   '/s/$slug': typeof SSlugRoute
@@ -166,10 +180,12 @@ export interface FileRoutesByTo {
   '/briefing': typeof AuthenticatedBriefingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/devices': typeof AuthenticatedDevicesRoute
+  '/foresight': typeof AuthenticatedForesightRoute
   '/globe': typeof AuthenticatedGlobeRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/oracle': typeof AuthenticatedOracleRoute
   '/presets': typeof AuthenticatedPresetsRoute
+  '/pulse': typeof AuthenticatedPulseRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shares': typeof AuthenticatedSharesRoute
   '/s/$slug': typeof SSlugRoute
@@ -189,10 +205,12 @@ export interface FileRoutesById {
   '/_authenticated/briefing': typeof AuthenticatedBriefingRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/devices': typeof AuthenticatedDevicesRoute
+  '/_authenticated/foresight': typeof AuthenticatedForesightRoute
   '/_authenticated/globe': typeof AuthenticatedGlobeRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/oracle': typeof AuthenticatedOracleRoute
   '/_authenticated/presets': typeof AuthenticatedPresetsRoute
+  '/_authenticated/pulse': typeof AuthenticatedPulseRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/shares': typeof AuthenticatedSharesRoute
   '/s/$slug': typeof SSlugRoute
@@ -212,10 +230,12 @@ export interface FileRouteTypes {
     | '/briefing'
     | '/dashboard'
     | '/devices'
+    | '/foresight'
     | '/globe'
     | '/history'
     | '/oracle'
     | '/presets'
+    | '/pulse'
     | '/settings'
     | '/shares'
     | '/s/$slug'
@@ -233,10 +253,12 @@ export interface FileRouteTypes {
     | '/briefing'
     | '/dashboard'
     | '/devices'
+    | '/foresight'
     | '/globe'
     | '/history'
     | '/oracle'
     | '/presets'
+    | '/pulse'
     | '/settings'
     | '/shares'
     | '/s/$slug'
@@ -255,10 +277,12 @@ export interface FileRouteTypes {
     | '/_authenticated/briefing'
     | '/_authenticated/dashboard'
     | '/_authenticated/devices'
+    | '/_authenticated/foresight'
     | '/_authenticated/globe'
     | '/_authenticated/history'
     | '/_authenticated/oracle'
     | '/_authenticated/presets'
+    | '/_authenticated/pulse'
     | '/_authenticated/settings'
     | '/_authenticated/shares'
     | '/s/$slug'
@@ -321,6 +345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/pulse': {
+      id: '/_authenticated/pulse'
+      path: '/pulse'
+      fullPath: '/pulse'
+      preLoaderRoute: typeof AuthenticatedPulseRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/presets': {
       id: '/_authenticated/presets'
       path: '/presets'
@@ -347,6 +378,13 @@ declare module '@tanstack/react-router' {
       path: '/globe'
       fullPath: '/globe'
       preLoaderRoute: typeof AuthenticatedGlobeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/foresight': {
+      id: '/_authenticated/foresight'
+      path: '/foresight'
+      fullPath: '/foresight'
+      preLoaderRoute: typeof AuthenticatedForesightRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/devices': {
@@ -430,10 +468,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBriefingRoute: typeof AuthenticatedBriefingRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDevicesRoute: typeof AuthenticatedDevicesRoute
+  AuthenticatedForesightRoute: typeof AuthenticatedForesightRoute
   AuthenticatedGlobeRoute: typeof AuthenticatedGlobeRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedOracleRoute: typeof AuthenticatedOracleRoute
   AuthenticatedPresetsRoute: typeof AuthenticatedPresetsRoute
+  AuthenticatedPulseRoute: typeof AuthenticatedPulseRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSharesRoute: typeof AuthenticatedSharesRoute
 }
@@ -446,10 +486,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBriefingRoute: AuthenticatedBriefingRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDevicesRoute: AuthenticatedDevicesRoute,
+  AuthenticatedForesightRoute: AuthenticatedForesightRoute,
   AuthenticatedGlobeRoute: AuthenticatedGlobeRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedOracleRoute: AuthenticatedOracleRoute,
   AuthenticatedPresetsRoute: AuthenticatedPresetsRoute,
+  AuthenticatedPulseRoute: AuthenticatedPulseRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSharesRoute: AuthenticatedSharesRoute,
 }

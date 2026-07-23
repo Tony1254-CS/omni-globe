@@ -52,9 +52,9 @@ function PulsePage() {
 
   const items = pulses.data ?? [];
   const current = items.find((x: any) => x.id === selectedId) ?? items[0];
-  const pulse: Pulse | null = current?.pulse ?? null;
-  const snapshot = current?.snapshot ?? null;
-  const tod = snapshot?.timeOfDay ?? "morning";
+  const pulse: Pulse | null = (current?.pulse as unknown as Pulse | null) ?? null;
+  const snapshot = (current?.snapshot as any) ?? null;
+  const tod = (snapshot?.timeOfDay as string) ?? "morning";
   const gradient = GRADIENTS[tod] ?? GRADIENTS.morning;
 
   useEffect(() => {
