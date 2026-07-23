@@ -1,4 +1,5 @@
 import type { WidgetDataResult, WidgetDataValue, WidgetSettings } from "./widget-data.types";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 type CacheEntry = { value?: WidgetDataResult; expiresAt: number; retryAt: number; failures: number; pending?: Promise<WidgetDataResult> };
 const providerCache = new Map<string, CacheEntry>();
@@ -66,7 +67,15 @@ const stableSettings = (settings: WidgetSettings) => Object.fromEntries(Object.e
 export async function fetchWidgetData(type: string, settings: WidgetSettings): Promise<WidgetDataResult> {
   const cacheKey = `${type}:${JSON.stringify(stableSettings(settings))}`;
   const now = Date.now();
-  const cached = providerCache.get(cacheKey);
+  let cached = providerCache.get(cacheKey);
+  if (!cached) {
+    const { data } = await supabaseAdmin.from("provider_cache").select("payload, expires_at").eq("cache_key", cacheKey).maybeSingle();
+    if (data?.payload && typeof data.payload === "object" && !Array.isArray(data.payload)) {
+      const value = data.payload as unknown as WidgetDataResult;
+      cached = { value, expiresAt: new Date(data.expires_at).getTime(), retryAt: 0, failures: 0 };
+      providerCache.set(cacheKey, cached);
+    }
+  }
   if (cached?.value && cached.expiresAt > now) return cached.value;
   if (cached?.retryAt && cached.retryAt > now) {
     if (cached.value) return { ...cached.value, stale: true, status: "cached", retryAt: new Date(cached.retryAt).toISOString() };
@@ -75,7 +84,10 @@ export async function fetchWidgetData(type: string, settings: WidgetSettings): P
   if (cached?.pending) return cached.pending;
 
   const pending = fetchWidgetDataFresh(type, settings).then((value) => {
-    providerCache.set(cacheKey, { value: { ...value, status: "live" }, expiresAt: Date.now() + (CACHE_TTL[type] ?? 5 * 60_000), retryAt: 0, failures: 0 });
+    const expiresAt = Date.now() + (CACHE_TTL[type] ?? 5 * 60_000);
+    const liveValue = { ...value, status: "live" as const };
+    providerCache.set(cacheKey, { value: liveValue, expiresAt, retryAt: 0, failures: 0 });
+    void supabaseAdmin.from("provider_cache").upsert({ cache_key: cacheKey, payload: liveValue as any, expires_at: new Date(expiresAt).toISOString(), created_at: new Date().toISOString() });
     return { ...value, status: "live" as const };
   }).catch((error: unknown) => {
     const previous = providerCache.get(cacheKey);

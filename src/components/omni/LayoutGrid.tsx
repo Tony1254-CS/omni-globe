@@ -69,7 +69,7 @@ function ClientGrid({
       isResizable
       resizeHandles={["se", "sw", "e", "w", "s"]}
       onResizeStart={() => setResizing(true)}
-      onResize={(_layout, _old, item) => setResizeSize({ w: item.w, h: item.h })}
+      onResize={(_layout, _old, item) => item && setResizeSize({ w: item.w, h: item.h })}
       onResizeStop={() => { setResizing(false); setResizeSize(null); }}
     >
       {children}
