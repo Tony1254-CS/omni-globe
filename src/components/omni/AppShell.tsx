@@ -12,6 +12,7 @@ import { getMyProfile } from "@/lib/profile.functions";
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/globe", label: "Globe", icon: Globe2 },
+  { to: "/oracle", label: "Oracle", icon: Brain },
   { to: "/briefing", label: "Briefing", icon: Sparkles },
   { to: "/alerts", label: "Alerts", icon: Bell },
   { to: "/automations", label: "Automations", icon: Zap },
