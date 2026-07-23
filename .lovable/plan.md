@@ -1,40 +1,83 @@
-## Problem
+# OMNISPHERE 2.0 — Layer 1: Predictive Intelligence
 
-`/globe`, `/alerts`, and `/history` are still placeholder "coming in Phase X" screens — they render a single icon + text with no functionality. That's why they appear broken.
+Adds an AI-powered "Insights" layer on top of the existing widgets. All using free/keyless data sources + Lovable AI. No new paid dependencies.
 
-## Plan: make all three pages functional
+## What ships
 
-### 1. Globe (`/globe`) — interactive 3D globe
-- Add `globe.gl` + `three` as deps.
-- New `src/components/omni/GlobeView.tsx`, browser-only via `React.lazy` behind `<ClientOnly>` (Leaflet/globe.gl rule).
-- Data layers driven by the existing `getWidgetData` server fn:
-  - ISS position (auto-refresh every 5s) — moving marker + orbit ring.
-  - Earthquakes (last 24h, USGS) — pulsing points sized by magnitude.
-  - Favourite locations from `favourite_locations` table — labeled pins.
-- Controls: toggle each layer, auto-rotate on/off, click a point to see a detail popover (place, magnitude, time, link).
-- Full-viewport dark canvas with neon glow matching the design system.
+### 1. Anomaly Detection Engine
+- New shared helper that scores each widget's current data against a rolling baseline (z-score for numeric series, magnitude/threshold rules for events).
+- Rules per widget type:
+  - **Earthquakes**: flag events > 2σ above 30-day magnitude mean, or in low-seismicity regions.
+  - **Crypto**: flag 24h change > 2σ vs 30-day volatility.
+  - **AQI**: flag jumps > 50 vs 24h mean, or crossing WHO thresholds.
+  - **Weather**: flag temp/wind > 2σ vs seasonal norm from Open-Meteo climate endpoint.
+  - **ISS / SpaceX / news**: no anomaly score (event-based).
+- Each `LiveWidget` gets an **Attention Score** badge (green/amber/red) computed client-side from the fetched data. Red widgets glow with a neon pulse ring.
 
-### 2. Alerts (`/alerts`) — threshold alerts
-- New table `public.alerts` (id, user_id, kind, params jsonb, threshold, comparator, enabled, last_triggered_at, created_at) with RLS `auth.uid() = user_id` and standard grants.
-- Server fns in `src/lib/alerts.functions.ts`: `listAlerts`, `createAlert`, `updateAlert`, `deleteAlert`, `evaluateAlerts` (pulls latest values via existing widget-data fetchers, compares, updates `last_triggered_at`, returns fired alerts).
-- UI: list of alerts with enable toggle, add-alert dialog with kind picker (Crypto price, Earthquake magnitude, Weather temp, AQI), comparator (`>`, `<`), threshold input, and per-kind params (coin, coordinates, min magnitude).
-- Client polls `evaluateAlerts` every 60s while page open; fired alerts show a sonner toast + inline "triggered" badge.
+### 2. Forecasting
+- Uses providers we already query — no new keys:
+  - **Weather anomaly**: Open-Meteo already returns 5-day forecast; compare vs climate normals → "Unusual cold snap in 72h — 87% confidence".
+  - **Aftershocks**: apply Omori's law (`p(t) = K/(t+c)^p`) to recent mainshock → "≈4 aftershocks M≥3 expected next 24h". Pure math, no ML training.
+  - **Crypto reversal**: RSI + MACD crossover from CoinGecko history → "Momentum weakening, reversal signal (62% conf)".
+  - **AQI tomorrow**: Open-Meteo air-quality forecast endpoint (already available) with health-band advisory.
+- Confidence is derived, not fabricated (variance-based). Every forecast card shows source + method.
 
-### 3. History (`/history`) — historical charts
-- No new tables; use free historical APIs already keyless:
-  - Weather: Open-Meteo `archive-api` (`/v1/archive`) for temperature by lat/lon + date range.
-  - Crypto: CoinGecko `/coins/{id}/market_chart` for price history.
-  - Earthquakes: USGS `query` endpoint filtered by date + min magnitude, shown as a time-bucketed bar chart.
-- Extend `widget-data.server.ts` with a `fetchHistory(kind, params)` helper and expose `getHistoryData` server fn (auth-gated, same pattern as `getWidgetData`).
-- UI: dataset picker + parameter inputs + date-range slider (default last 30 days). Charts via `recharts` (already common in this stack; add if missing). URL search params (`?kind=&from=&to=&...`) drive state so views are shareable.
+### 3. Daily "Executive Briefing" (in-app, on demand)
+- New route `/_authenticated/briefing` and a dashboard card with a "Generate briefing" button.
+- Server function collects:
+  - User favourite locations (weather + AQI snapshots)
+  - Current widget snapshots on their dashboard
+  - Top anomalies from the anomaly engine
+  - Top 5 headlines from their news/reddit widgets
+- Passes the compact snapshot to Lovable AI (`google/gemini-3.6-flash`) with a strict system prompt: "2-page executive briefing — key world events, weather risks, financial shifts, space milestones. Prioritise the user's watched locations and topics."
+- Rendered in-app with `react-markdown`. "Copy" and "Download as .md" buttons. Cached in a new `briefings` table so re-opening the page shows the last one instantly.
 
-### 4. SEO / metadata
-- Give each route a route-specific `head()` title + description + og:title/og:description (already partly there; extend to include og:type + twitter:card and unique copy).
+## Where things live
 
-## Technical notes
-- All data fetches go through authenticated `createServerFn` + `requireSupabaseAuth` (matches existing pattern).
-- Errors return `{ error }` shape like `getWidgetData` so pages never blank.
-- Loaders on `_authenticated/*` routes are safe (route gate handles auth); use `ensureQueryData` + `useSuspenseQuery`.
-- Add `errorComponent` + `notFoundComponent` to each new route.
+```text
+src/lib/
+  anomaly.ts                    # pure scoring functions, no I/O
+  forecast.server.ts            # aftershock/RSI/climate normals math
+  forecast.functions.ts         # getForecast server fn
+  briefing.server.ts            # snapshot collector + AI call
+  briefing.functions.ts         # generateBriefing, listBriefings
 
-Ready to build once you approve. Want all three in one pass, or should I ship them one route at a time (Globe first)?
+src/components/omni/
+  AttentionBadge.tsx            # green/amber/red pill + tooltip
+  ForecastCard.tsx              # forecast rendering (in LiveWidget footer)
+  BriefingView.tsx              # markdown briefing UI
+
+src/routes/_authenticated/
+  briefing.tsx                  # new route, dashboard nav item
+```
+
+Modified: `LiveWidget.tsx` (mount anomaly badge + forecast footer where relevant), `AppShell.tsx` (add "Briefing" nav item), `dashboard.tsx` (add briefing shortcut card).
+
+## Backend
+
+One migration:
+
+```sql
+CREATE TABLE public.briefings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  content text NOT NULL,
+  snapshot jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, DELETE ON public.briefings TO authenticated;
+GRANT ALL ON public.briefings TO service_role;
+ALTER TABLE public.briefings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "own briefings" ON public.briefings
+  FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+```
+
+`LOVABLE_API_KEY` is already provisioned — no user action needed.
+
+## Explicitly out of scope this iteration
+- What-If simulator (Layer 1 item 3) — deferred; needs a UI surface we'll design after briefing lands.
+- Scheduled/email/voice briefing delivery (needs email domain setup + TTS budget).
+- Everything in Layers 2–8.
+
+## Verification
+- Playwright: open dashboard → verify red badge appears when a synthetic quake/crypto value is out-of-band; open `/briefing` → click generate → assert markdown renders with the user's location names in it.

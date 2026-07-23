@@ -62,6 +62,30 @@ export type Database = {
         }
         Relationships: []
       }
+      briefings: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          snapshot: Json
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          snapshot?: Json
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          snapshot?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       favourite_locations: {
         Row: {
           created_at: string
