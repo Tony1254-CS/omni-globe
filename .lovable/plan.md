@@ -1,36 +1,37 @@
-# OmniSphere reliability and Liquid Glass rebuild
 
-## 1. Stop provider failures from breaking widgets
-- Add a shared server-side provider cache keyed by widget type and normalized settings, so many users/widgets do not repeatedly hit the same public API.
-- Deduplicate concurrent requests and assign provider-specific cache windows: short for ISS, moderate for weather/AQI/markets, longer for static and daily sources.
-- Handle HTTP 429 correctly: honor `Retry-After`, apply exponential cooldown, stop immediate manual/query retries during cooldown, and serve the last successful cached result marked as stale when available.
-- Add independent fallback providers for weather and air quality instead of retrying the same rate-limited host. The current code calls Open-Meteo directly for both cards with no server cache or backoff (`src/lib/widget-data.server.ts:11-27, 51-57`).
-- Audit all remaining widget adapters for response-shape drift, rate limits, invalid settings, and unavailable sources; keep honest provider-specific error states when neither fresh nor cached data exists.
+## Problems (verified)
 
-## 2. Make widget status and recovery clear
-- Replace the generic “Live source unavailable” block with polished states for rate-limited, offline, stale-cache, invalid settings, and empty data.
-- Show the next automatic retry time and disable repeated retry clicks during cooldown.
-- Preserve last-known data with a subtle “cached” timestamp rather than blanking the entire card.
-- Keep global/per-widget location controls and make location status visible on weather and AQI cards.
+1. **Two "Command Center" headers.** `src/routes/_authenticated/route.tsx` wraps `<Outlet />` in `AppShell`, and most child routes (`agents`, `alerts`, `automations`, `achievements`, `devices`, `presets`, `shares`, and likely `dashboard`, `globe`, `briefing`, `history`, `settings`) ALSO wrap their content in `<AppShell>`. Result: shell + header + sidebar render twice, matching the screenshot.
+2. **Sidebar bottom cut off.** In `AppShell.tsx` the `<nav>` uses `overflow-hidden` and there is no scroll region. On a 582px-tall viewport, 12 nav items + brand + sign-out don't fit, and the user can't reach Settings / Sign out.
+3. **Cards don't feel like liquid glass.** Current `.liquid-glass` is a flat translucent panel with a static specular line. No animated blur, no gradient sheen tracking, no press state, no depth on hover.
 
-## 3. Implement the selected Liquid Glass Command design
-- Match selected direction v2 using the locked **Graphite Glass** palette (`#0B0D10`, `#242831`, `#E8EDF4`, `#38BDF8`) and existing **Sora + Manrope** typography.
-- Rebuild semantic tokens for both dark and light modes with layered translucent tint, strong backdrop blur/saturation, bright inner rim, top-edge specular sheen, dark ambient shadow, and subtle grain/refraction.
-- Apply the liquid-glass material consistently to widget cards, command bar, sidebar, dialogs, controls, empty states, and error surfaces—without nesting decorative cards.
-- Use restrained cyan only for active, focus, data, and resize feedback; remove the current cheap neon treatment and flat card fill.
+## Fix
 
-## 4. Smooth, stable hover sidebar
-- Keep icons perfectly fixed while the rail expands as an overlay, so the workspace never shifts.
-- Use a spring-like 500ms width curve, delayed label fade/slide, coordinated active indicator, and softened hover highlights.
-- Add a small close delay to prevent flicker when the pointer crosses gaps, plus keyboard focus behavior and reduced-motion support.
-- Preserve a compact, usable mobile navigation rather than forcing desktop hover behavior on touch devices.
+### 1. Single shell (remove duplicates)
+Remove the `<AppShell>` wrapper from every child route file under `src/routes/_authenticated/*.tsx`. Keep it only in `_authenticated/route.tsx` around `<Outlet />`. Files to edit: `dashboard.tsx`, `globe.tsx`, `briefing.tsx`, `alerts.tsx`, `automations.tsx`, `agents.tsx`, `devices.tsx`, `presets.tsx`, `shares.tsx`, `achievements.tsx`, `history.tsx`, `settings.tsx` — replace `<AppShell>…</AppShell>` with the inner content and drop the import.
 
-## 5. Premium asymmetric resizable canvas
-- Preserve free drag/resize behavior while giving the workspace an asymmetric 8/4 visual hierarchy: larger primary intelligence widgets and compact supporting cards.
-- Keep multi-edge resizing, but replace tiny cyan corner marks with discoverable edge/corner affordances, larger hit targets, live size feedback, and a refined active glass glow.
-- Ensure widget internals reflow cleanly at minimum dimensions and do not clip controls or text.
+### 2. Scrollable sidebar
+In `AppShell.tsx`:
+- Change nav to `flex-1 overflow-y-auto` with thin custom scrollbar hidden until hover.
+- Add `max-h-screen` on the aside and switch `inset-y-4` layout so brand stays sticky top, sign-out sticky bottom, nav scrolls between.
+- Add a subtle top/bottom fade mask so users see there's more content.
 
-## 6. Verification
-- Test every widget adapter through its server function, including fallback, cache, stale data, cooldown, bad settings, and provider error paths.
-- Verify sidebar hover/focus animation, light/dark contrast, drag/resize persistence, global location inheritance, and dashboard responsiveness at desktop and mobile widths.
-- Run the project’s automated checks and browser smoke tests; confirm there are no console errors, overlapping controls, or failed primary widget flows.
+### 3. True Apple-style liquid glass (widget cards)
+Rewrite `.liquid-glass` and `.widget-surface` in `src/styles.css`:
+- Layered background: base translucent tint + radial highlight in top-left + soft radial shadow in bottom-right, all in `color-mix` with the primary token.
+- `backdrop-filter: blur(40px) saturate(180%) brightness(1.05)` with a keyframed shimmer that slowly drifts the highlight (8s ease-in-out infinite, respects `prefers-reduced-motion`).
+- Border: 1px gradient border via `border-image` from `oklch(1 0 0 / .35)` to `oklch(1 0 0 / .06)`.
+- Inner shadows for the "wet glass" edge: bright inset top, dark inset bottom, plus a faint colored glow ring.
+- `.glass-specular::before` becomes a conic/linear sheen that animates position on hover (transform: translateX).
+- Hover: lift `translateY(-3px)`, boost blur to 48px, brighten border, add primary-tinted glow.
+- Active/press: `scale(0.985)` with reduced shadow — gives the "liquid settling" feel.
+- Add a `.liquid-glass-strong` variant for the sidebar/header so the whole system reads consistent.
+
+Apply the same treatment to `.command-bar`, `.sidebar-rail`, and `.liquid-control` so buttons and header share the material.
+
+### 4. Verify
+- `bun run build` clean.
+- Playwright screenshot of `/dashboard` at 734×582 confirming: one header only, sidebar Settings + Sign out reachable via scroll, widget cards showing the new material and hover lift.
+
+## Out of scope
+Widget data reliability, resize logic, and the 429 recovery UI already staged in `LiveWidget.tsx` — untouched this turn.
