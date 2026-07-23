@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Brain, Plus, Send, Trash2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/omni/AppShell";
+
 import { askOracle, createThread, deleteThread, listMessages, listThreads } from "@/lib/oracle.functions";
 
 export const Route = createFileRoute("/_authenticated/oracle")({
@@ -94,8 +94,8 @@ function OraclePage() {
   }
 
   return (
-    <AppShell>
-      <div className="grid gap-4 md:grid-cols-[280px_1fr]" style={{ height: "calc(100vh - 8rem)" }}>
+    <div className="grid gap-4 md:grid-cols-[280px_1fr]" style={{ height: "calc(100vh - 8rem)" }}>
+
         {/* Thread list */}
         <aside className="glass flex min-h-0 flex-col p-3">
           <button
@@ -212,7 +212,6 @@ function OraclePage() {
             </button>
           </form>
         </section>
-      </div>
-    </AppShell>
+    </div>
   );
 }
