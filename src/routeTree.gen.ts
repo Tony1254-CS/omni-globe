@@ -18,6 +18,8 @@ import { Route as AuthenticatedGlobeRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedBriefingRouteImport } from './routes/_authenticated/briefing'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
+import { Route as ApiPublicHooksRunAutomationsRouteImport } from './routes/api/public/hooks/run-automations'
+import { Route as ApiPublicHooksDeviceIngestRouteImport } from './routes/api/public/hooks/device-ingest'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -63,6 +65,18 @@ const AuthenticatedAlertsRoute = AuthenticatedAlertsRouteImport.update({
   path: '/alerts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicHooksRunAutomationsRoute =
+  ApiPublicHooksRunAutomationsRouteImport.update({
+    id: '/api/public/hooks/run-automations',
+    path: '/api/public/hooks/run-automations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksDeviceIngestRoute =
+  ApiPublicHooksDeviceIngestRouteImport.update({
+    id: '/api/public/hooks/device-ingest',
+    path: '/api/public/hooks/device-ingest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -73,6 +87,8 @@ export interface FileRoutesByFullPath {
   '/globe': typeof AuthenticatedGlobeRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/hooks/device-ingest': typeof ApiPublicHooksDeviceIngestRoute
+  '/api/public/hooks/run-automations': typeof ApiPublicHooksRunAutomationsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -83,6 +99,8 @@ export interface FileRoutesByTo {
   '/globe': typeof AuthenticatedGlobeRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/hooks/device-ingest': typeof ApiPublicHooksDeviceIngestRoute
+  '/api/public/hooks/run-automations': typeof ApiPublicHooksRunAutomationsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -95,6 +113,8 @@ export interface FileRoutesById {
   '/_authenticated/globe': typeof AuthenticatedGlobeRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/hooks/device-ingest': typeof ApiPublicHooksDeviceIngestRoute
+  '/api/public/hooks/run-automations': typeof ApiPublicHooksRunAutomationsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -107,6 +127,8 @@ export interface FileRouteTypes {
     | '/globe'
     | '/history'
     | '/settings'
+    | '/api/public/hooks/device-ingest'
+    | '/api/public/hooks/run-automations'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -117,6 +139,8 @@ export interface FileRouteTypes {
     | '/globe'
     | '/history'
     | '/settings'
+    | '/api/public/hooks/device-ingest'
+    | '/api/public/hooks/run-automations'
   id:
     | '__root__'
     | '/'
@@ -128,12 +152,16 @@ export interface FileRouteTypes {
     | '/_authenticated/globe'
     | '/_authenticated/history'
     | '/_authenticated/settings'
+    | '/api/public/hooks/device-ingest'
+    | '/api/public/hooks/run-automations'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicHooksDeviceIngestRoute: typeof ApiPublicHooksDeviceIngestRoute
+  ApiPublicHooksRunAutomationsRoute: typeof ApiPublicHooksRunAutomationsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -201,6 +229,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAlertsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/run-automations': {
+      id: '/api/public/hooks/run-automations'
+      path: '/api/public/hooks/run-automations'
+      fullPath: '/api/public/hooks/run-automations'
+      preLoaderRoute: typeof ApiPublicHooksRunAutomationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/device-ingest': {
+      id: '/api/public/hooks/device-ingest'
+      path: '/api/public/hooks/device-ingest'
+      fullPath: '/api/public/hooks/device-ingest'
+      preLoaderRoute: typeof ApiPublicHooksDeviceIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -229,6 +271,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicHooksDeviceIngestRoute: ApiPublicHooksDeviceIngestRoute,
+  ApiPublicHooksRunAutomationsRoute: ApiPublicHooksRunAutomationsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
