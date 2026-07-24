@@ -162,14 +162,14 @@ Each entry below has three parts: **What it is**, **Why we use it**, **Where you
 - **Why:** unlike a library, you own the code and can restyle freely. Perfect for our "liquid glass" look.
 - **Where:** `components.json` config; component patterns throughout `src/components/`.
 
-### Lovable Cloud (Supabase under the hood)
+### Supabase (PostgreSQL & Auth)
 - **What:** hosted Postgres database + authentication + storage, with row-level security (RLS).
 - **Why:** one product gives us the DB, login, and a client SDK. RLS lets each user only see their own rows.
 - **Where:** `src/integrations/supabase/*`, `supabase/migrations/*`.
 
-### Lovable AI Gateway
-- **What:** a single API endpoint that proxies to Gemini (and other) models. No API keys to manage in code — the platform injects them.
-- **Why:** free tier for demos, unified billing, easy model swaps.
+### Google Gemini AI Engine
+- **What:** unified AI engine powered by Google Gemini (e.g. Gemini 2.5 Flash).
+- **Why:** high performance, cost-effective, multi-turn reasoning and summary generation.
 - **Where:** `src/lib/pulse.server.ts`, `oracle.functions.ts`, `briefing.server.ts`, `agents.server.ts`, `foresight.server.ts`.
 
 ### Cloudflare Workers (via Nitro)
@@ -483,7 +483,7 @@ Whenever a provider returns 429/5xx, the server falls back to (a) the alternate 
 
 ## 12. AI Usage
 
-All AI calls go through the **Lovable AI Gateway** at `https://ai.gateway.lovable.dev/v1/chat/completions` with `Authorization: Bearer $LOVABLE_API_KEY`.
+All AI calls go through `src/lib/ai-chat.server.ts` directly to Google Gemini API (`GEMINI_API_KEY`).
 
 | Feature | Model | Prompt shape |
 |---|---|---|
