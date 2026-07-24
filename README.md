@@ -33,9 +33,6 @@
 
 OMNISPHERE is architected as an edge-ready, serverless application utilizing **TanStack Start**, **Vite**, **Nitro**, **Supabase**, and **Google Gemini AI**.
 
-<details>
-<summary>🔍 <b>Click to expand System Architecture Diagram</b></summary>
-
 ```mermaid
 flowchart TB
     subgraph Client["💻 Client Layer (Browser)"]
@@ -96,8 +93,6 @@ flowchart TB
     Auth <--> RLS
     RLS <--> Tables
 ```
-
-</details>
 
 ---
 
