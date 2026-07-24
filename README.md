@@ -33,6 +33,9 @@
 
 OMNISPHERE is architected as an edge-ready, serverless application utilizing **TanStack Start**, **Vite**, **Nitro**, **Supabase**, and **Google Gemini AI**.
 
+<details>
+<summary>🔍 <b>Click to expand System Architecture Diagram</b></summary>
+
 ```mermaid
 flowchart TB
     subgraph Client["💻 Client Layer (Browser)"]
@@ -94,11 +97,16 @@ flowchart TB
     RLS <--> Tables
 ```
 
+</details>
+
 ---
 
 ## 🗄️ Database Entity-Relationship (ER) Diagram
 
 The persistence layer is built on Supabase PostgreSQL with strict **Row Level Security (RLS)** ensuring isolated multi-tenant data privacy.
+
+<details>
+<summary>📐 <b>Click to expand Database ER Diagram</b></summary>
 
 ```mermaid
 erDiagram
@@ -235,6 +243,8 @@ erDiagram
     automations ||--o{ automation_runs : "records history"
     agents ||--o{ agent_runs : "executes tasks"
 ```
+
+</details>
 
 ---
 
