@@ -19,12 +19,10 @@ type ChatOptions = {
 
 // Map Lovable-gateway model ids to Google's OpenAI-compat model ids.
 function mapToGemini(lovableModel: string | undefined): string {
-  if (!lovableModel) return "gemini-2.0-flash";
+  if (!lovableModel) return "gemini-2.5-flash";
   const m = lovableModel.replace(/^google\//, "");
-  // Direct Gemini API doesn't accept every gateway preview id — fall back to stable flash.
-  if (/gemini-3/i.test(m)) return "gemini-2.0-flash";
-  if (/pro/i.test(m)) return "gemini-2.0-pro-exp";
-  return "gemini-2.0-flash";
+  if (/pro/i.test(m)) return "gemini-2.5-pro";
+  return "gemini-2.5-flash";
 }
 
 export async function callChat(opts: ChatOptions): Promise<string> {
@@ -66,7 +64,10 @@ export async function callChat(opts: ChatOptions): Promise<string> {
     signal: AbortSignal.timeout(timeoutMs),
   });
 
-  if (res.status === 429) throw new Error("Rate limit — please try again in a moment.");
+  if (res.status === 429) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Rate limit / Quota exceeded — please ensure your GEMINI_API_KEY is an API key from Google AI Studio (starts with AIza...) and has quota available.`);
+  }
   if (res.status === 402) throw new Error("AI credits exhausted. Add credits/billing to your provider.");
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
